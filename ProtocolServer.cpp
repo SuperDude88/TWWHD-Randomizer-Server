@@ -14,7 +14,7 @@
 #include <thread>
 #include <chrono>
 
-constexpr long ACCEPT_TIMEOUT_MSEC = 10000; // ~~100 ms~~ currently 10s for test
+constexpr long POLL_TIMEOUT_MSEC = 100; // 100 ms
 
 ProtocolServer::ProtocolServer(uint16_t port) : port(port), acceptingClients(false)
 {
@@ -42,7 +42,7 @@ bool ProtocolServer::initialize()
 
 void ProtocolServer::acceptCallback()
 {
-    SocketType clientSocket;
+    SocketType clientSocket = INVALID_SOCKET;
     int haveData;
     socklen_t clientLen;
     char clientIP[64];
@@ -58,13 +58,12 @@ void ProtocolServer::acceptCallback()
 
     while(acceptingClients)
     {
-        haveData = SOCK_POLL(pfds, 1, -1);
+        haveData = SOCK_POLL(pfds, 1, POLL_TIMEOUT_MSEC);
         if (haveData == 0)
         {
-            Utility::platformLog("exited poll with haveData %d\n", haveData);
             if(haveData < 0)
             {
-                Utility::platformLog("exited select with errno %d\n", errno);
+                Utility::platformLog("exited poll with errno %d\n", errno);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
             continue;
@@ -93,18 +92,15 @@ bool ProtocolServer::start()
 
 bool ProtocolServer::stop()
 {
-    Utility::platformLog("shutting down server\n");
     acceptingClients = false;
     // TODO: something hanging on shutdown; unclear if thread or error caused by shutdown/close
     if(acceptThread.joinable())
     {
         acceptThread.join();
     }
-    Utility::platformLog("accept thread exited\n");
     if (acceptSocket != -1)
     {
         SOCK_CLOSE(acceptSocket);
-        Utility::platformLog("socket closed\n");
     }
     acceptSocket = -1;
     return true;

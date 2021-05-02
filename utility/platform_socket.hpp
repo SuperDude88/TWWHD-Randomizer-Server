@@ -8,13 +8,14 @@
 	#include <ws2tcpip.h>
 	#pragma comment(lib, "Ws2_32.lib")
 	#define SocketType SOCKET
-    #define SOCK_POLL WSAPoll
+  #define SOCK_POLL WSAPoll
 	#define SOCK_CLOSE closesocket
 #else
 	#include <netinet/in.h>
 	#define SocketType int
 	#define SOCK_POLL poll
 	#define SOCK_CLOSE close
+	#define INVALID_SOCKET -1
 #endif
 
 #if defined(PLATFORM_DKP)

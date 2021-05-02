@@ -36,8 +36,8 @@ hello_thread()
 int
 main(int argc, char **argv)
 {
-   Utility::platformInit();
    Utility::netInit();
+   Utility::platformInit();
 
    ProtocolServer server(1234);
 
@@ -50,15 +50,15 @@ main(int argc, char **argv)
      server.start();
    }
 
-   while (Utility::platformIsRunning())
-   {
-     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-   }
+   // wait until termination signal is received. In the case of wii u this is
+   // the home button, otherwise, ctrl-c
+   Utility::waitForPlatformStop();
 
    // if server never started, this does nothing
    server.stop();
+   Utility::platformLog("server successfully stopped\n");
 
-   Utility::netShutdown();
    Utility::platformShutdown();
+   Utility::netShutdown();
    return 0;
 }

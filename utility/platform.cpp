@@ -1,11 +1,29 @@
+
 #include "platform.hpp"
+#include <thread>
 
 #ifdef PLATFORM_DKP
 	#include <whb/proc.h>
 	#include <whb/log.h>
 	#include <whb/log_console.h>
 	#define PRINTF_BUFFER_LENGTH 2048
+#elif defined(PLATFORM_MSVC)
+	#include <signal.h>
 #endif 
+
+static bool _platformIsRunning = true;
+
+static void sigHandler(int signal)
+{
+	switch (signal)
+	{
+	case SIGINT:
+	case SIGBREAK:
+		printf("ctrl+c\n");
+		_platformIsRunning = false;
+		break;
+	}
+}
 
 namespace Utility
 {
@@ -31,6 +49,9 @@ namespace Utility
 #ifdef PLATFORM_DKP
 		WHBProcInit();
 		WHBLogConsoleInit();
+#else
+		signal(SIGINT, sigHandler);
+		signal(SIGBREAK, sigHandler);
 #endif
 		return true;
 	}
@@ -40,8 +61,16 @@ namespace Utility
 #ifdef PLATFORM_DKP
 		return WHBProcIsRunning();
 #else
-		return true;
+		return _platformIsRunning;
 #endif
+	}
+
+	void waitForPlatformStop()
+	{
+		while (platformIsRunning())
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
 	}
 
 	void platformShutdown()

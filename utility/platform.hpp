@@ -17,6 +17,9 @@
 	#define PLATFORM_DKP
 #endif
 
+// if this gets sufficiently extensive, we'll want to break out into different
+// target files/directories and use cmake to subtitute pre-makefile
+
 namespace Utility
 {
 	void platformLog(const char* f, ...);
@@ -24,6 +27,8 @@ namespace Utility
 	bool platformInit();
 
 	bool platformIsRunning();
+
+	void waitForPlatformStop();
 
 	void platformShutdown();
 }

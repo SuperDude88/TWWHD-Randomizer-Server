@@ -17,7 +17,7 @@ public:
 private:
     uint16_t port;
     SocketType acceptSocket = -1;
-    sockaddr_in serverAddr;
+    sockaddr_in serverAddr{};
     bool acceptingClients;
     std::thread acceptThread;
 
