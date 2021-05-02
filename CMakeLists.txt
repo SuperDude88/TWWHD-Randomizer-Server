@@ -6,9 +6,8 @@ if(DEFINED DEVKITPRO)
   add_definitions(-DDEVKITPRO)
 endif()
 
-find_package(Threads REQUIRED)
-
 if(CMAKE_USE_PTHREADS_INIT)
+  find_package(Threads REQUIRED)
   message("here")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -std=c++11")
   set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -17,8 +16,9 @@ endif()
 
 add_executable(wwhd_rando_server main.cpp ProtocolServer.cpp json.hpp)
 add_subdirectory("utility")
-target_link_libraries(wwhd_rando_server Threads::Threads)
-target_compile_features(wwhd_rando_server PUBLIC cxx_std_11)
+if(CMAKE_USE_PTHREADS_INIT)
+  target_link_libraries(wwhd_rando_server Threads::Threads)
+endif()
 
 if(DEFINED DEVKITPRO)
   wut_create_rpx(wwhd_rando_server)
