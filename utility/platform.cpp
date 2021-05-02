@@ -1,14 +1,13 @@
 
 #include "platform.hpp"
 #include <thread>
+#include <csignal>
 
 #ifdef PLATFORM_DKP
 	#include <whb/proc.h>
 	#include <whb/log.h>
 	#include <whb/log_console.h>
 	#define PRINTF_BUFFER_LENGTH 2048
-#elif defined(PLATFORM_MSVC)
-	#include <signal.h>
 #endif 
 
 static bool _platformIsRunning = true;
@@ -18,7 +17,9 @@ static void sigHandler(int signal)
 	switch (signal)
 	{
 	case SIGINT:
+#ifdef SIGBREAK
 	case SIGBREAK:
+#endif
 		printf("ctrl+c\n");
 		_platformIsRunning = false;
 		break;
