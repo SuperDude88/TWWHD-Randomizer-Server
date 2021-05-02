@@ -1,4 +1,5 @@
 #include "platform_socket.hpp"
+#include <fcntl.h>
 
 namespace Utility
 {
@@ -41,6 +42,30 @@ namespace Utility
 		return sock == INVALID_SOCKET;
 #else
 		return sock < 0;
+#endif
+	}
+
+	bool setSocketBlockingFlag(SocketType sock, bool blocking)
+	{
+		if (isSocketInvalid(sock))
+		{
+			return false;
+		}
+#ifdef PLATFORM_MSVC
+		unsigned long mode = blocking ? 0 : 1;
+		return ioctlsocket(sock, FIONBIO, &mode) == 0;
+#else
+		int flags = fcntl(sock, F_GETFL, 0);
+		int mask = 0;
+		if (flags == -1) return false;
+#ifdef PLATFORM_DKP
+		mask = SO_NONBLOCK;
+#else 
+		mask = O_NONBLOCK;
+#endif
+		if (blocking) flags = flags & ~mask;
+		else flags = flags | mask;
+		return fcntl(sock, F_SETFL, flags) == 0;
 #endif
 	}
 }

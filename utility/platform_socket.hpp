@@ -29,4 +29,6 @@ namespace Utility
 	void netShutdown();
 
 	bool isSocketInvalid(SocketType sock);
+
+	bool setSocketBlockingFlag(SocketType sock, bool blocking);
 }
