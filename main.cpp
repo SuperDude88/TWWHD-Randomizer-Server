@@ -1,76 +1,64 @@
-#include <coreinit/thread.h>
-#include <coreinit/time.h>
-#include <coreinit/systeminfo.h>
-#include <nn/ac.h>
 
-#include <whb/proc.h>
-#include <whb/log.h>
-#include <whb/log_console.h>
+#include "utility/platform_socket.hpp"
 
 #include <thread>
+#include <chrono>
+#include <cstring>
 
-#include "utility/byteswap.hpp"
+#include "ProtocolServer.hpp"
+
 
 int
 hello_thread()
 {
    int last_tm_sec = -1;
    uint32_t ip = 0;
-   WHBLogPrintf("Hello World from a std::thread!");
+   
+   Utility::platformLog("Hello World from a std::thread!\n");
 
-   if (!nn::ac::GetAssignedAddress(&ip)) {
-      WHBLogPrintf("GetAssignedAddress failed!");
+   ProtocolServer server(1234);
+   if(!server.initialize())
+   {
+     Utility::platformLog("server.initialize() failed\n");
+     return 1;
+   }
+   else
+   {
+      server.start();
    }
 
-   WHBLogPrintf("My IP is: %u.%u.%u.%u",
-                (ip >> 24) & 0xFF,
-                (ip >> 16) & 0xFF,
-                (ip >>  8) & 0xFF,
-                (ip >>  0) & 0xFF);
-
-   Utility::byteswap(ip);
-   uint16_t s = 0xABCD;
-   Utility::byteswap(s);
-
-   while(WHBProcIsRunning()) {
-      OSCalendarTime tm;
-      OSTicksToCalendarTime(OSGetTime(), &tm);
-
-      if (tm.tm_sec != last_tm_sec) {
-         WHBLogPrintf("%02d/%02d/%04d %02d:%02d:%02d I'm still here.",
-                      tm.tm_mday, tm.tm_mon, tm.tm_year,
-                      tm.tm_hour, tm.tm_min, tm.tm_sec);
-         last_tm_sec = tm.tm_sec;
-      }
-
-      WHBLogConsoleDraw();
-      OSSleepTicks(OSMillisecondsToTicks(100));
-   }
-
-   WHBLogPrintf("Exiting... good bye.");
-   WHBLogConsoleDraw();
-   OSSleepTicks(OSMillisecondsToTicks(1000));
+   server.stop();
+   Utility::platformLog("Exiting... good bye.\n");
+   std::this_thread::sleep_for(std::chrono::milliseconds(100));
    return 0;
 }
 
 int
 main(int argc, char **argv)
 {
-   nn::ac::ConfigIdNum configId;
+   Utility::platformInit();
+   Utility::netInit();
 
-   nn::ac::Initialize();
-   nn::ac::GetStartupId(&configId);
-   nn::ac::Connect(configId);
+   ProtocolServer server(1234);
 
-   WHBProcInit();
-   WHBLogConsoleInit();
+   if (!server.initialize())
+   {
+     Utility::platformLog("server.initialize() failed\n");
+   }
+   else
+   {
+     server.start();
+   }
 
-   std::thread t(hello_thread);
-   t.join();
+   while (Utility::platformIsRunning())
+   {
+     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+   }
 
-   WHBLogConsoleFree();
-   WHBProcShutdown();
+   // if server never started, this does nothing
+   server.stop();
 
-   nn::ac::Finalize();
+   Utility::netShutdown();
+   Utility::platformShutdown();
    return 0;
 }
