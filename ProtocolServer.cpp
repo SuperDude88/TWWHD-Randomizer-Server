@@ -93,7 +93,6 @@ bool ProtocolServer::start()
 bool ProtocolServer::stop()
 {
     acceptingClients = false;
-    // TODO: something hanging on shutdown; unclear if thread or error caused by shutdown/close
     if(acceptThread.joinable())
     {
         acceptThread.join();

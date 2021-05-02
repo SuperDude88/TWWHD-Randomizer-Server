@@ -11,8 +11,6 @@
 int
 hello_thread()
 {
-   int last_tm_sec = -1;
-   uint32_t ip = 0;
    
    Utility::platformLog("Hello World from a std::thread!\n");
 

@@ -52,7 +52,9 @@ namespace Utility
 		WHBLogConsoleInit();
 #else
 		signal(SIGINT, sigHandler);
+#ifdef SIGBREAK
 		signal(SIGBREAK, sigHandler);
+#endif
 #endif
 		return true;
 	}
