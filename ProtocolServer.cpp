@@ -16,9 +16,11 @@
 #include <chrono>
 
 constexpr long POLL_TIMEOUT_MSEC = 100; // 100 ms
+constexpr size_t PROCESSING_CV_TIMEOUT_MSEC = 100;
+constexpr size_t SOCKET_RECV_SIZE = 1024;
 
 ProtocolServer::ProtocolServer(uint16_t port) 
-    : port(port), acceptingClients(false), processingRequests(false)
+    : port(port), acceptingClients(false), receivingData(false)
 {
 
 }
@@ -51,15 +53,17 @@ bool ProtocolServer::start()
 {
     // TODO: check we are initialized
     acceptingClients = true;
-    processingRequests = true;
+    receivingData = true;
     acceptThread = std::thread(&ProtocolServer::acceptCallback, this);
-    processThread = std::thread(&ProtocolServer::processCallback, this);
+    receiveThread = std::thread(&ProtocolServer::receiveCallback, this);
+    processingThread = std::thread(&ProtocolServer::processingCallback, this);
     return true;
 }
 
 bool ProtocolServer::stop()
 {
     acceptingClients = false;
+    receivingData = false;
     processingRequests = false;
 
     // wait for server threads to stop
@@ -67,9 +71,13 @@ bool ProtocolServer::stop()
     {
         acceptThread.join();
     }
-    if (processThread.joinable())
+    if (receiveThread.joinable())
     {
-        processThread.join();
+        receiveThread.join();
+    }
+    if (processingThread.joinable())
+    {
+        processingThread.join();
     }
 
     // close sockets
@@ -83,11 +91,11 @@ bool ProtocolServer::stop()
         SOCK_CLOSE(sock);
     }
     newSockets.clear();
-    for (const auto& sock : processingSockets)
+    for (const auto& entry : socketDataMap)
     {
-        SOCK_CLOSE(sock);
+        SOCK_CLOSE(entry.first);
     }
-    processingSockets.clear();
+    socketDataMap.clear();
     acceptSocket = -1;
     return true;
 }
@@ -139,47 +147,101 @@ void ProtocolServer::acceptCallback()
     }
 }
 
-void ProtocolServer::processCallback()
+void ProtocolServer::handleSocketRecvError(SocketType sock, int err)
 {
-    pollfd* pfds = nullptr;
+    Utility::platformLog("Got socket recv error: %d\n", err);
+    switch (err)
+    {
+    case EAGAIN:
+    case EWOULDBLOCK:
+        break;
+    default:
+        break;
+    }
+}
+
+void ProtocolServer::handleSocketDisconnect(SocketType sock)
+{
+    removedSockets.push_back(sock);
+}
+
+void ProtocolServer::processSocketData()
+{
+    size_t prev_newline = 0, newline = 0;
+    for (auto& entry : socketDataMap)
+    {
+        const auto& sock = entry.first;
+        auto& data = entry.second;
+        {
+            while ((newline = data.find_first_of('\n', prev_newline)) != std::string::npos)
+            {
+                std::lock_guard<std::mutex> guard(serverRequestsMut);
+                serverRequests.push({ sock, data.substr(prev_newline, newline) });
+                prev_newline = newline + 1;
+            }
+        }
+        data.erase(0, newline + 1);
+    }
+    serverRequestsCV.notify_all();
+}
+
+void ProtocolServer::receiveCallback()
+{
+    pollfd* pfds{nullptr};
     size_t prevSocketCount = 0, newSocketCount = 0, pfdsIndex = 0;
-    int haveData;
-    while (processingRequests)
+    int haveData = 0, bytesReceived = 0;
+    char receivedData[SOCKET_RECV_SIZE];
+    while (receivingData)
     {
         {
             std::lock_guard<std::mutex> guard(newSocketMut);
             for (const auto& sockToAdd : newSockets)
             {
-                processingSockets.push_back(sockToAdd);
+                // NOTE: may be unecessary if inherited from accept socket
+                if (!Utility::setSocketBlockingFlag(sockToAdd, false))
+                {
+                    Utility::platformLog("Unable to set socket %d to non-blocking\n", sockToAdd);
+                    continue;
+                }
+                socketDataMap.emplace(sockToAdd, "");
             }
             newSockets.clear();
         }
-        newSocketCount = processingSockets.size();
+        newSocketCount = socketDataMap.size();
         if (newSocketCount != prevSocketCount)
         {
             if (pfds)
             {
                 delete[] pfds;
+                pfds = nullptr;
             }
-            pfds = new pollfd[newSocketCount];
+            if (newSocketCount > 0) {
+                pfds = new pollfd[newSocketCount];
+            }
+            prevSocketCount = newSocketCount;
         }
-        if (!pfds) // extra null check
+        if (!pfds) // no clients case
         {
-            Utility::platformLog("waiting for clients...\n");
-            std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // POLL_TIMEOUT_MSEC
+            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC)); // POLL_TIMEOUT_MSEC
             continue;
         }
         // assemble poll file descriptor set
         pfdsIndex = 0;
-        for (const auto sock : processingSockets)
+        for (const auto& entry : socketDataMap)
         {
+            const auto sock = entry.first;
             pfds[pfdsIndex].fd = sock;
             pfds[pfdsIndex].events = POLLIN;
             pfdsIndex++;
+            // extra bounds check just in case and to suppress warning
+            if (pfdsIndex >= newSocketCount) break; 
         }
         // call poll on descriptor set
         haveData = SOCK_POLL(pfds, newSocketCount, POLL_TIMEOUT_MSEC);
-        if (haveData == 0) continue; // timeout case
+        if (haveData == 0)
+        {
+            continue; // timeout case
+        }
         else if (haveData < 0)
         {
             // handle error case by just logging for now
@@ -189,18 +251,72 @@ void ProtocolServer::processCallback()
         }
 
         pfdsIndex = 0;
-        for (const auto& sock : processingSockets)
+        for (auto& entry : socketDataMap)
         {
-            if (pfds[pfdsIndex].events & POLLIN)
+            const auto sock = pfds[pfdsIndex].fd;
+            auto& data = entry.second;
+            auto& revents = pfds[pfdsIndex].revents;
+            if (sock != entry.first)
+            {
+                Utility::platformLog("Encountered pfds/socketDataMap mismatch!\n");
+                continue;
+            }
+            if (revents & POLLIN)
             {
                 Utility::platformLog("socket fd %d received data!\n", sock);
-                // do processing on sock here
+                bytesReceived = recv(sock, receivedData, sizeof(receivedData), 0);
+                if (bytesReceived == 0) // TODO: orderly disconnect case
+                {
+                    handleSocketDisconnect(sock);
+                }
+                else if (bytesReceived < 0) // TODO: err or timeout case
+                {
+                    handleSocketRecvError(sock, errno);
+                }
+                else // got data case
+                {
+                    data.append(receivedData, bytesReceived);
+                }
+            }
+            if (revents & POLLHUP)
+            {
+                handleSocketDisconnect(sock); // sudden disconnect/abort case
             }
             pfdsIndex++;
+            if (pfdsIndex >= newSocketCount) break;
         }
+
+        processSocketData();
+
+        for (auto sock : removedSockets)
+        {
+            Utility::platformLog("removing client at sock %d\n", sock);
+            socketDataMap.erase(sock);
+            SOCK_CLOSE(sock);
+        }
+        removedSockets.clear();
     }
     if (pfds)
     {
         delete[] pfds;
+    }
+}
+
+void ProtocolServer::processingCallback()
+{
+    auto waitDuration = std::chrono::milliseconds(PROCESSING_CV_TIMEOUT_MSEC);
+    while (processingRequests)
+    {
+        std::unique_lock<std::mutex> lock(serverRequestsMut);
+        if (!serverRequestsCV.wait_for(lock, waitDuration, [&] {return serverRequests.size() > 0; }))
+        {
+            // periodically check we are sitll running
+            continue;
+        }
+        ServerRequest request = serverRequests.front();
+        serverRequests.pop();
+        lock.unlock();
+        //process request
+        Utility::platformLog("%d: %s\n", request.sock, request.data.c_str());
     }
 }

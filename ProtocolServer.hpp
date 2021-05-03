@@ -4,6 +4,8 @@
 #include "utility/platform_socket.hpp"
 #include <thread>
 #include <vector>
+#include <queue>
+#include <unordered_map>
 #include <mutex>
 
 class ProtocolServer
@@ -17,17 +19,32 @@ public:
 
     bool stop();
 private:
+    struct ServerRequest
+    {
+        SocketType sock;
+        std::string data;
+    };
     uint16_t port;
     SocketType acceptSocket = -1;
     sockaddr_in serverAddr{};
     bool acceptingClients;
+    bool receivingData;
     bool processingRequests;
     std::vector<SocketType> newSockets;
     std::mutex newSocketMut;
-    std::vector<SocketType> processingSockets;
+    std::unordered_map<SocketType, std::string> socketDataMap;
+    std::vector<SocketType> removedSockets;
+    std::queue<ServerRequest> serverRequests;
+    std::mutex serverRequestsMut;
+    std::condition_variable serverRequestsCV;
     std::thread acceptThread;
-    std::thread processThread;
+    std::thread receiveThread;
+    std::thread processingThread;
 
     void acceptCallback();
-    void processCallback();
+    void receiveCallback();
+    void processingCallback();
+    void handleSocketRecvError(SocketType sock, int err);
+    void handleSocketDisconnect(SocketType sock);
+    void processSocketData();
 };

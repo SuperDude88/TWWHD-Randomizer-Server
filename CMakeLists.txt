@@ -16,6 +16,7 @@ endif()
 
 add_executable(wwhd_rando_server main.cpp ProtocolServer.cpp json.hpp)
 add_subdirectory("utility")
+set_property(TARGET wwhd_rando_server PROPERTY CXX_STANDARD 11)
 if(CMAKE_USE_PTHREADS_INIT)
   target_link_libraries(wwhd_rando_server Threads::Threads)
 endif()
