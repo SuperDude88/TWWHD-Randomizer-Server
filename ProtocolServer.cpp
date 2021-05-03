@@ -152,7 +152,9 @@ void ProtocolServer::handleSocketRecvError(SocketType sock, int err)
     Utility::platformLog("Got socket recv error: %d\n", err);
     switch (err)
     {
+#ifdef PLATFORM_MSVC
     case EAGAIN:
+#endif
     case EWOULDBLOCK:
         break;
     default:

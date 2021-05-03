@@ -7,6 +7,7 @@
 #include <queue>
 #include <unordered_map>
 #include <mutex>
+#include <condition_variable>
 
 class ProtocolServer
 {
