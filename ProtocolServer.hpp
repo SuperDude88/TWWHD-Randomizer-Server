@@ -2,6 +2,7 @@
 #pragma once
 
 #include "utility/platform_socket.hpp"
+#include "command/CommandHandler.hpp"
 #include <thread>
 #include <vector>
 #include <queue>
@@ -41,6 +42,7 @@ private:
     std::thread acceptThread;
     std::thread receiveThread;
     std::thread processingThread;
+    CommandHandler commandHandler;
 
     void acceptCallback();
     void receiveCallback();

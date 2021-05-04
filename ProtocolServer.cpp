@@ -54,6 +54,7 @@ bool ProtocolServer::start()
     // TODO: check we are initialized
     acceptingClients = true;
     receivingData = true;
+    processingRequests = true;
     acceptThread = std::thread(&ProtocolServer::acceptCallback, this);
     receiveThread = std::thread(&ProtocolServer::receiveCallback, this);
     processingThread = std::thread(&ProtocolServer::processingCallback, this);
@@ -175,14 +176,14 @@ void ProtocolServer::processSocketData()
         const auto& sock = entry.first;
         auto& data = entry.second;
         {
-            while ((newline = data.find_first_of('\n', prev_newline)) != std::string::npos)
+            while (data.size() > 0 && (newline = data.find_first_of('\n', prev_newline)) != std::string::npos)
             {
                 std::lock_guard<std::mutex> guard(serverRequestsMut);
                 serverRequests.push({ sock, data.substr(prev_newline, newline) });
                 prev_newline = newline + 1;
+                data.erase(0, prev_newline);
             }
         }
-        data.erase(0, newline + 1);
     }
     serverRequestsCV.notify_all();
 }
@@ -265,7 +266,6 @@ void ProtocolServer::receiveCallback()
             }
             if (revents & POLLIN)
             {
-                Utility::platformLog("socket fd %d received data!\n", sock);
                 bytesReceived = recv(sock, receivedData, sizeof(receivedData), 0);
                 if (bytesReceived == 0) // TODO: orderly disconnect case
                 {
@@ -319,6 +319,6 @@ void ProtocolServer::processingCallback()
         serverRequests.pop();
         lock.unlock();
         //process request
-        Utility::platformLog("%d: %s\n", request.sock, request.data.c_str());
+        commandHandler.handleCommand(request.data);
     }
 }
