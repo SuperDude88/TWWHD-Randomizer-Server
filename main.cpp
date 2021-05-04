@@ -7,29 +7,7 @@
 
 #include "ProtocolServer.hpp"
 
-
-int
-hello_thread()
-{
-   
-   Utility::platformLog("Hello World from a std::thread!\n");
-
-   ProtocolServer server(1234);
-   if(!server.initialize())
-   {
-     Utility::platformLog("server.initialize() failed\n");
-     return 1;
-   }
-   else
-   {
-      server.start();
-   }
-
-   server.stop();
-   Utility::platformLog("Exiting... good bye.\n");
-   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-   return 0;
-}
+#define SERVER_TCP_PORT 1234
 
 int
 main(int argc, char **argv)
@@ -37,7 +15,7 @@ main(int argc, char **argv)
    Utility::netInit();
    Utility::platformInit();
 
-   ProtocolServer server(1234);
+   ProtocolServer server(SERVER_TCP_PORT);
 
    if (!server.initialize())
    {
