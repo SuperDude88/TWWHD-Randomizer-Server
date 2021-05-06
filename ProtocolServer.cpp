@@ -32,11 +32,12 @@ bool ProtocolServer::initialize()
     {
         return false;
     }
-    // set socket to non-blocking
-    if (!Utility::setSocketBlockingFlag(acceptSocket, false))
-    {
-      return false;
-    }
+    // set socket to non-blocking - apparently non-functional with current wut impl;
+    // falling back to blocking setup
+    // if (!Utility::setSocketBlockingFlag(acceptSocket, false))
+    // {
+    //   return false;
+    // }
     memset(reinterpret_cast<char*>(&serverAddr), '\0', sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
@@ -67,19 +68,9 @@ bool ProtocolServer::stop()
     receivingData = false;
     processingRequests = false;
 
-    // wait for server threads to stop
-    if (acceptThread.joinable())
-    {
-        acceptThread.join();
-    }
-    if (receiveThread.joinable())
-    {
-        receiveThread.join();
-    }
-    if (processingThread.joinable())
-    {
-        processingThread.join();
-    }
+    // TODO: possibly add a more robust termination signalling system with CVs
+    // or future etc. so we can wait a bit for a clean exit, then force close
+    // the sockets if needed
 
     // close sockets
     if (acceptSocket != -1)
@@ -97,11 +88,26 @@ bool ProtocolServer::stop()
         SOCK_CLOSE(entry.first);
     }
     socketDataMap.clear();
+
+    // wait for server threads to stop
+    if (acceptThread.joinable())
+    {
+        acceptThread.join();
+    }
+    if (receiveThread.joinable())
+    {
+        receiveThread.join();
+    }
+    if (processingThread.joinable())
+    {
+        processingThread.join();
+    }
+
     acceptSocket = -1;
     return true;
 }
 
-void ProtocolServer::acceptCallback()
+int ProtocolServer::acceptCallback()
 {
     SocketType clientSocket = INVALID_SOCKET;
     int haveData;
@@ -119,7 +125,7 @@ void ProtocolServer::acceptCallback()
 
     while(acceptingClients)
     {
-        haveData = SOCK_POLL(pfds, 1, POLL_TIMEOUT_MSEC);
+        haveData = SOCK_POLL(pfds, 1, POLL_TIMEOUT_MSEC * 10);
         if (haveData == 0)
         {
             if(haveData < 0)
@@ -127,25 +133,23 @@ void ProtocolServer::acceptCallback()
                 Utility::platformLog("exited poll with errno %d\n", errno);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
+            Utility::platformLog("waiting to accept...\n");
             continue;
         }
         if(pfds[0].revents & POLLIN)
         {
-            std::lock_guard<std::mutex> guard(newSocketMut);
-            bool validSocket = true;
-            do
+            clientSocket = accept(acceptSocket, (struct sockaddr*)&clientAddr, &clientLen);
+            Utility::platformLog("accepted socket fd %d\n", clientSocket);
+            if (!Utility::isSocketInvalid(clientSocket))
             {
-                clientSocket = accept(acceptSocket, (struct sockaddr*)&clientAddr, &clientLen);
-                validSocket = !Utility::isSocketInvalid(clientSocket);
-                if (validSocket)
-                {
-                    newSockets.push_back(clientSocket);
-                }
-            } while (validSocket);
+                inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, sizeof(clientIP));
+                Utility::platformLog("client FD %d connected from addr %s\n", clientSocket, clientIP);
+                std::lock_guard<std::mutex> guard(newSocketMut);
+                newSockets.push_back(clientSocket);
+            }
         }
-        inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, sizeof(clientIP));
-        Utility::platformLog("client connected from addr %s\n", clientIP);
     }
+    return 0;
 }
 
 void ProtocolServer::handleSocketRecvError(SocketType sock, int err)
@@ -170,28 +174,27 @@ void ProtocolServer::handleSocketDisconnect(SocketType sock)
 
 void ProtocolServer::processSocketData()
 {
-    size_t prev_newline = 0, newline = 0;
+    size_t newline = 0;
     for (auto& entry : socketDataMap)
     {
         const auto& sock = entry.first;
         auto& data = entry.second;
         {
-            while (data.size() > 0 && (newline = data.find_first_of('\n', prev_newline)) != std::string::npos)
+            while (data.size() > 0 && (newline = data.find_first_of('\n')) != std::string::npos)
             {
                 std::lock_guard<std::mutex> guard(serverRequestsMut);
-                serverRequests.push({ sock, data.substr(prev_newline, newline) });
-                prev_newline = newline + 1;
-                data.erase(0, prev_newline);
+                serverRequests.push({ sock, data.substr(0, newline) });
+                data.erase(0, newline + 1);
             }
         }
     }
     serverRequestsCV.notify_all();
 }
 
-void ProtocolServer::receiveCallback()
+int ProtocolServer::receiveCallback()
 {
     pollfd* pfds{nullptr};
-    size_t prevSocketCount = 0, newSocketCount = 0, pfdsIndex = 0;
+    size_t prevSocketCount = 0, newSocketCount = 0, pfdsIndex = 0, bytesAvailable = 0;
     int haveData = 0, bytesReceived = 0;
     char receivedData[SOCKET_RECV_SIZE];
     while (receivingData)
@@ -200,12 +203,13 @@ void ProtocolServer::receiveCallback()
             std::lock_guard<std::mutex> guard(newSocketMut);
             for (const auto& sockToAdd : newSockets)
             {
-                // NOTE: may be unecessary if inherited from accept socket
-                if (!Utility::setSocketBlockingFlag(sockToAdd, false))
-                {
-                    Utility::platformLog("Unable to set socket %d to non-blocking\n", sockToAdd);
-                    continue;
-                }
+                // NOTE: may be unecessary if inherited from accept socket; disabled for now since
+                // it doesn't seem to work on DKP
+                //if (!Utility::setSocketBlockingFlag(sockToAdd, false))
+                //{
+                //    Utility::platformLog("Unable to set socket %d to non-blocking\n", sockToAdd);
+                //    continue;
+                //}
                 socketDataMap.emplace(sockToAdd, "");
             }
             newSockets.clear();
@@ -225,7 +229,8 @@ void ProtocolServer::receiveCallback()
         }
         if (!pfds) // no clients case
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC)); // POLL_TIMEOUT_MSEC
+            Utility::platformLog("waiting for clients...\n");
+            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC * 10)); // POLL_TIMEOUT_MSEC
             continue;
         }
         // assemble poll file descriptor set
@@ -240,9 +245,10 @@ void ProtocolServer::receiveCallback()
             if (pfdsIndex >= newSocketCount) break; 
         }
         // call poll on descriptor set
-        haveData = SOCK_POLL(pfds, newSocketCount, POLL_TIMEOUT_MSEC);
+        haveData = SOCK_POLL(pfds, static_cast<unsigned int>(newSocketCount), POLL_TIMEOUT_MSEC * 10);
         if (haveData == 0)
         {
+            Utility::platformLog("poll no data\n");
             continue; // timeout case
         }
         else if (haveData < 0)
@@ -252,7 +258,7 @@ void ProtocolServer::receiveCallback()
             std::this_thread::sleep_for(std::chrono::seconds(1));
             continue;
         }
-
+        Utility::platformLog("socks with revents: %d\n", haveData);
         pfdsIndex = 0;
         for (auto& entry : socketDataMap)
         {
@@ -266,7 +272,17 @@ void ProtocolServer::receiveCallback()
             }
             if (revents & POLLIN)
             {
-                bytesReceived = recv(sock, receivedData, sizeof(receivedData), 0);
+                if (!Utility::getSocketBytesAvailable(sock, bytesAvailable) || bytesAvailable == 0)
+                {
+                    Utility::platformLog("Unable to retreive number of bytes avaialble for sock %d\n", sock);
+                    continue;
+                }
+                if (bytesAvailable > sizeof(receivedData))
+                {
+                    bytesAvailable = sizeof(receivedData);
+                }
+                Utility::platformLog("attempting to recv %d bytes from sockfd %d\n", bytesAvailable, sock);
+                bytesReceived = recv(sock, receivedData, bytesAvailable, 0);
                 if (bytesReceived == 0) // TODO: orderly disconnect case
                 {
                     handleSocketDisconnect(sock);
@@ -280,7 +296,7 @@ void ProtocolServer::receiveCallback()
                     data.append(receivedData, bytesReceived);
                 }
             }
-            if (revents & POLLHUP)
+            if (revents & (POLLHUP | POLLNVAL | POLLERR))
             {
                 handleSocketDisconnect(sock); // sudden disconnect/abort case
             }
@@ -302,23 +318,30 @@ void ProtocolServer::receiveCallback()
     {
         delete[] pfds;
     }
+    return 0;
 }
 
-void ProtocolServer::processingCallback()
+int ProtocolServer::processingCallback()
 {
-    auto waitDuration = std::chrono::milliseconds(PROCESSING_CV_TIMEOUT_MSEC);
+    auto waitDuration = std::chrono::milliseconds(PROCESSING_CV_TIMEOUT_MSEC * 10);
     while (processingRequests)
     {
         std::unique_lock<std::mutex> lock(serverRequestsMut);
+        // can possibly replace with a non-tiumeout wait and push in some kind of 
+        // signal entry (e.g. sock = -1) value to stop
         if (!serverRequestsCV.wait_for(lock, waitDuration, [&] {return serverRequests.size() > 0; }))
         {
-            // periodically check we are sitll running
+            Utility::platformLog("no requests...\n");
+            // periodically check we are still running
             continue;
         }
         ServerRequest request = serverRequests.front();
         serverRequests.pop();
         lock.unlock();
         //process request
-        commandHandler.handleCommand(request.data);
+        Utility::platformLog("handling: %s\n", request.data.c_str());
+        std::string response;
+        commandHandler.handleCommand(request.data, response);
     }
+    return 0;
 }

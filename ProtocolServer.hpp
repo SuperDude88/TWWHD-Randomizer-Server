@@ -44,9 +44,9 @@ private:
     std::thread processingThread;
     CommandHandler commandHandler;
 
-    void acceptCallback();
-    void receiveCallback();
-    void processingCallback();
+    int acceptCallback();
+    int receiveCallback();
+    int processingCallback();
     void handleSocketRecvError(SocketType sock, int err);
     void handleSocketDisconnect(SocketType sock);
     void processSocketData();

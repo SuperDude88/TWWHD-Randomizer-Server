@@ -1,6 +1,10 @@
 #include "platform_socket.hpp"
 #include <fcntl.h>
 
+#ifndef PLATFORM_MSVC
+	#include <sys/ioctl.h>
+#endif
+
 namespace Utility
 {
 	bool netInit()
@@ -58,14 +62,27 @@ namespace Utility
 		int flags = fcntl(sock, F_GETFL, 0);
 		int mask = 0;
 		if (flags == -1) return false;
-#ifdef PLATFORM_DKP
-		mask = SO_NONBLOCK;
-#else 
-		mask = O_NONBLOCK;
-#endif
-		if (blocking) flags = flags & ~mask;
-		else flags = flags | mask;
+		if (blocking) flags = flags & ~O_NONBLOCK;
+		else flags = flags | O_NONBLOCK;
 		return fcntl(sock, F_SETFL, flags) == 0;
 #endif
+	}
+
+	bool getSocketBytesAvailable(SocketType sock, size_t& bytesAvailable)
+	{
+		unsigned long ioctlResult;
+#ifdef PLATFORM_MSVC
+		if (ioctlsocket(sock, FIONREAD, &ioctlResult))
+		{
+			return false;
+		}
+#else
+		if (ioctl(sock, FIONREAD, &ioctlResult))
+		{
+			return false;
+		}
+#endif
+		bytesAvailable = ioctlResult;
+		return true;
 	}
 }

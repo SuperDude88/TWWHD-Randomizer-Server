@@ -10,7 +10,7 @@ class CommandHandler
 {
 public:
     using json = nlohmann::json;
-    std::string handleCommand(const std::string& command);
+    bool handleCommand(const std::string& command, std::string& response);
     struct Command {
         std::string name;
         std::vector<json> args; 

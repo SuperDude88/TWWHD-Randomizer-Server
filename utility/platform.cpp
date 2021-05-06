@@ -2,6 +2,7 @@
 #include "platform.hpp"
 #include <thread>
 #include <csignal>
+#include <mutex>
 
 #ifdef PLATFORM_DKP
 	#include <whb/proc.h>
@@ -11,6 +12,7 @@
 #endif 
 
 static bool _platformIsRunning = true;
+static std::mutex printMut;
 
 static void sigHandler(int signal)
 {
@@ -35,13 +37,16 @@ namespace Utility
 #endif
 		va_list args;
 		va_start(args, f);
+		std::unique_lock<std::mutex> lock(printMut);
 #ifdef PLATFORM_DKP
 		vsnprintf(buf, PRINTF_BUFFER_LENGTH - 1, f, args);
+		
 		WHBLogWrite(buf);
 		WHBLogConsoleDraw();
 #else
 		vprintf(f, args);
 #endif
+		lock.unlock();
 		va_end(args);
 	}
 

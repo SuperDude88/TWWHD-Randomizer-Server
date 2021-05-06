@@ -44,13 +44,24 @@ bool CommandHandler::getBinaryData(std::vector<json> args, std::string& response
     response.append(header.dump());
     response.push_back('\n');
     response.append(data, length);
+    delete[] data;
     return true;
 }
 
-std::string CommandHandler::handleCommand(const std::string& command)
+bool CommandHandler::handleCommand(const std::string& command, std::string& response)
 {
-    json cmdJson = json::parse(command);
+    // handles parse fail case
+    json cmdJson;
+    try
+    {
+        cmdJson = json::parse(command);
+    }
+    catch (const json::parse_error& ex)
+    {
+        Utility::platformLog("Unable to parse as json:\n%s\n", command.c_str());
+        return false;
+    }
     Command cmd = cmdJson.get<Command>();
     Utility::platformLog("cmd name: %s\n", cmd.name.c_str());
-    return "";
+    return true;
 }
