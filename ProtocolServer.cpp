@@ -136,6 +136,7 @@ int ProtocolServer::acceptCallback()
             Utility::platformLog("waiting to accept...\n");
             continue;
         }
+        // TODO: add handling of error events?
         if(pfds[0].revents & POLLIN)
         {
             clientSocket = accept(acceptSocket, (struct sockaddr*)&clientAddr, &clientLen);
@@ -275,6 +276,7 @@ int ProtocolServer::receiveCallback()
                 if (!Utility::getSocketBytesAvailable(sock, bytesAvailable) || bytesAvailable == 0)
                 {
                     Utility::platformLog("Unable to retreive number of bytes avaialble for sock %d\n", sock);
+                    handleSocketDisconnect(sock);
                     continue;
                 }
                 if (bytesAvailable > sizeof(receivedData))

@@ -52,11 +52,8 @@ bool CommandHandler::handleCommand(const std::string& command, std::string& resp
 {
     // handles parse fail case
     json cmdJson;
-    try
-    {
-        cmdJson = json::parse(command);
-    }
-    catch (const json::parse_error& ex)
+    cmdJson = json::parse(command, nullptr, false);
+    if(cmdJson.is_discarded())
     {
         Utility::platformLog("Unable to parse as json:\n%s\n", command.c_str());
         return false;
