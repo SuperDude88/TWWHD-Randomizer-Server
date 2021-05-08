@@ -275,6 +275,7 @@ int ProtocolServer::receiveCallback()
             {
                 if (!Utility::getSocketBytesAvailable(sock, bytesAvailable) || bytesAvailable == 0)
                 {
+                    // such a situation after getting a POLLIN event indicates disconnect
                     Utility::platformLog("Unable to retreive number of bytes avaialble for sock %d\n", sock);
                     handleSocketDisconnect(sock);
                     continue;
@@ -326,6 +327,7 @@ int ProtocolServer::receiveCallback()
 int ProtocolServer::processingCallback()
 {
     auto waitDuration = std::chrono::milliseconds(PROCESSING_CV_TIMEOUT_MSEC * 10);
+    int sentBytes = 0;
     while (processingRequests)
     {
         std::unique_lock<std::mutex> lock(serverRequestsMut);
@@ -343,7 +345,25 @@ int ProtocolServer::processingCallback()
         //process request
         Utility::platformLog("handling: %s\n", request.data.c_str());
         std::string response;
+        // need to do anything different for error or not?
         commandHandler.handleCommand(request.data, response);
+
+        if (sentBytes = send(request.sock, response.c_str(), response.size(), 0) < 0)
+        {
+            Utility::platformLog("got error trying to send on sock %d: %d\n", request.sock, errno);
+            continue;
+        }
+        if (sentBytes != response.size())
+        {
+            // if this is happening, will need to introduce send inside while loop 
+            Utility::platformLog(
+                "only able to send %d / %d bytes for socket %d\n", 
+                sentBytes, 
+                response.size(), 
+                request.sock
+            );
+            continue;
+        }
     }
     return 0;
 }

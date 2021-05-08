@@ -16,7 +16,8 @@ public:
         std::vector<json> args; 
     };
 private:
-    bool getBinaryData(std::vector<json> args, std::string& response);
+    bool getBinaryData(const std::vector<json>& args, std::string& response);
+    void makeErrorJson(std::string errorMessage, std::string& response);
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CommandHandler::Command, name, args);
