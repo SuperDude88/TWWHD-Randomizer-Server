@@ -1,0 +1,3 @@
+[submodule "ext/ext/libiosuhax"]
+	path = ext/libiosuhax
+	url = https://github.com/yawut/libiosuhax.git

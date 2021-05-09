@@ -31,4 +31,9 @@ namespace Utility
 	void waitForPlatformStop();
 
 	void platformShutdown();
+
+	// these functions are always -1 in a non-homebrew context
+	int32_t getMCPHandle();
+
+	int32_t getFSAHandle();
 }
