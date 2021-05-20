@@ -111,12 +111,13 @@ namespace Utility {
 
         Utility::platformLog("getting MCPHandle\n");
         // acquire MCP tunnel
-        int32_t mcpHandle = getMCPHandle();
+        int32_t mcpHandle = MCP_Open();
         if (mcpHandle < 0) {
-            Utility::platformLog("Failed to open MPC to load all the games and updates\n");
+            Utility::platformLog("Failed to open MCP to read all the games and updates\n");
             return false;
         }
 
+        Utility::platformLog("got MCPHandle: %d\n", mcpHandle);
         // Get titles from MCP
         Utility::platformLog("getting title count\n");
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -129,13 +130,16 @@ namespace Utility {
         Utility::platformLog("title count: %d\n", titleCount);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         uint32_t titleByteSize = titleCount * sizeof(struct MCPTitleListType);
-
         rawTitlesOut.resize(titleCount);
 
-        uint32_t titlesListed;
-        Utility::platformLog("getting title list\n");
+        uint32_t titlesListed = 0;
+        Utility::platformLog("getting title list, titleByteSize=%u\n", titleByteSize);
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        MCP_TitleList(mcpHandle, &titlesListed, rawTitlesOut.data(), titleByteSize);
+        MCP_TitleList(mcpHandle, &titlesListed, rawTitlesOut.data(), sizeof(struct MCPTitleListType));
+
+        Utility::platformLog("title list acquired, count: %u\n", titlesListed);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        MCP_Close(mcpHandle);
 
         return true;
     }

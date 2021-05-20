@@ -11,6 +11,7 @@
 	#include <coreinit/mcp.h>
 	#include <coreinit/thread.h>
 	#include "iosuhax.h"
+	#include "iosuhax_cfw.h"
 	#include "iosuhax_devoptab.h"
 	#define PRINTF_BUFFER_LENGTH 2048
 	static int32_t mcpHookHandle = -1;
@@ -141,21 +142,50 @@ void haxStartCallback(IOSError arg1, void *arg2) {
 bool initIOSUHax()
 {
 	Utility::platformLog("starting IOSUHax...\n");
-	mcpHookHandle = MCP_Open();
-	if (mcpHookHandle < 0)
+	auto family = IOSUHAX_CFW_Family();
+	switch(family)
 	{
-		Utility::platformLog("Unable to acquire mcp Hook handle\n");
+	case IOSUHAX_CFW_MOCHA:
+		Utility::platformLog("detected MOCHA CFW\n");
+		break;
+	case IOSUHAX_CFW_HAXCHIFW:
+		Utility::platformLog("detected HAXCHI CFW\n");
+		break;
+	default:
+		Utility::platformLog("unable to detect CFW family\n");
+		break;
+	}
+	if(IOSUHAX_CFW_MCPAvailable() == 0)
+	{
+		Utility::platformLog("MCP inaccessible\n");
 		return false;
 	}
+	// if(IOSUHAX_CFW_Available() == 0)
+	// {
+	// 	Utility::platformLog("IOSUHAX not available\n");
+	// 	return false;
+	// }
 
-	IOS_IoctlAsync(mcpHookHandle, 0x62, nullptr, 0, nullptr, 0, haxStartCallback, nullptr);
-	OSSleepTicks(OSSecondsToTicks(2));
-	iosuhaxHandle = IOSUHAX_Open("/dev/mcp");
-	if (iosuhaxHandle < 0) {
-		closeIosuhax();
-        Utility::platformLog("Couldn't open iosuhax\n");
-        return false;
-    }
+	iosuhaxHandle = IOSUHAX_Open(nullptr);
+	if (iosuhaxHandle < 0) 
+	{
+		Utility::platformLog("Couldn't immediately open IOSUHAX, attempting to start\n");
+		mcpHookHandle = MCP_Open();
+		if (mcpHookHandle < 0)
+		{
+			Utility::platformLog("Unable to acquire mcp Hook handle\n");
+			return false;
+		}
+		IOS_IoctlAsync(mcpHookHandle, 0x62, nullptr, 0, nullptr, 0, haxStartCallback, (void*)0);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		if(IOSUHAX_Open("/dev/mcp") < 0)
+		{
+			MCP_Close(mcpHookHandle);
+			mcpHookHandle = -1;
+			Utility::platformLog("Unable to open iosuhax /dev/mcp\n");
+			return false;
+		}
+	}
 
 	fsaHandle = IOSUHAX_FSA_Open();
     if (fsaHandle < 0) {
@@ -163,18 +193,16 @@ bool initIOSUHax()
         Utility::platformLog("Couldn't open iosuhax FSA!\n");
         return false;
     }
-	Utility::platformLog(
-		"mcpHookHandle: %d\niosuhaxHandle: %d\nfsaHandle: %d\n",
-		mcpHookHandle, iosuhaxHandle, fsaHandle
-	);
+
+	Utility::platformLog("IOSUHAX initialized\n");
 	return true;
 }
 
 void closeIosuhax() {
-    if (fsaHandle > 0) IOSUHAX_FSA_Close(fsaHandle);
-    if (iosuhaxHandle > 0) IOSUHAX_Close();
-    if (mcpHookHandle > 0) MCP_Close(mcpHookHandle);
-    OSSleepTicks(OSSecondsToTicks(1));
+	if (fsaHandle >= 0) IOSUHAX_FSA_Close(fsaHandle);
+	if (iosuhaxHandle >= 0) IOSUHAX_Close();
+	OSSleepTicks(OSSecondsToTicks(1));
+    if (mcpHookHandle >= 0) MCP_Close(mcpHookHandle);
     mcpHookHandle = -1;
     fsaHandle = -1;
     iosuhaxHandle = -1;

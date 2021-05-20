@@ -9,8 +9,6 @@
 
 #ifdef PLATFORM_DKP
 #include "utility/wiiutitles.hpp"
-#include <iosuhax.h>
-#include <iosuhax_devoptab.h>
 #include <vector>
 #endif
 
@@ -39,6 +37,8 @@ main(int argc, char** argv)
 
 #ifdef PLATFORM_DKP
     std::vector<MCPTitleListType> rawTitles{};
+    Utility::platformLog("Getting raw titles\n");
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     if (Utility::getRawTitles(rawTitles))
     {
         for (auto& title : rawTitles)
