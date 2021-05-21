@@ -88,6 +88,12 @@ bool ProtocolServer::stop()
         SOCK_CLOSE(entry.first);
     }
     socketDataMap.clear();
+    // push an invalid element and wake up processing thread
+    {
+        std::lock_guard<std::mutex> guard(serverRequestsMut);
+        serverRequests.push({ INVALID_SOCKET, "" });
+    }
+    serverRequestsCV.notify_all();
 
     // wait for server threads to stop
     if (acceptThread.joinable())
@@ -133,7 +139,7 @@ int ProtocolServer::acceptCallback()
                 Utility::platformLog("exited poll with errno %d\n", errno);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
-            Utility::platformLog("waiting to accept...\n");
+           // Utility::platformLog("waiting to accept...\n");
             continue;
         }
         // TODO: add handling of error events?
@@ -150,6 +156,7 @@ int ProtocolServer::acceptCallback()
             }
         }
     }
+    Utility::platformLog("Accept thread exiting.\n");
     return 0;
 }
 
@@ -230,8 +237,8 @@ int ProtocolServer::receiveCallback()
         }
         if (!pfds) // no clients case
         {
-            Utility::platformLog("waiting for clients...\n");
-            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC * 10)); // POLL_TIMEOUT_MSEC
+            //Utility::platformLog("waiting for clients...\n");
+            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC)); // POLL_TIMEOUT_MSEC
             continue;
         }
         // assemble poll file descriptor set
@@ -246,7 +253,7 @@ int ProtocolServer::receiveCallback()
             if (pfdsIndex >= newSocketCount) break; 
         }
         // call poll on descriptor set
-        haveData = SOCK_POLL(pfds, static_cast<unsigned int>(newSocketCount), POLL_TIMEOUT_MSEC * 10);
+        haveData = SOCK_POLL(pfds, static_cast<unsigned int>(newSocketCount), POLL_TIMEOUT_MSEC);
         if (haveData == 0)
         {
             Utility::platformLog("poll no data\n");
@@ -285,7 +292,7 @@ int ProtocolServer::receiveCallback()
                     bytesAvailable = sizeof(receivedData);
                 }
                 Utility::platformLog("attempting to recv %d bytes from sockfd %d\n", bytesAvailable, sock);
-                bytesReceived = recv(sock, receivedData, bytesAvailable, 0);
+                bytesReceived = recv(sock, receivedData, static_cast<int>(bytesAvailable), 0);
                 if (bytesReceived == 0) // TODO: orderly disconnect case
                 {
                     handleSocketDisconnect(sock);
@@ -321,39 +328,38 @@ int ProtocolServer::receiveCallback()
     {
         delete[] pfds;
     }
+    Utility::platformLog("receive thread exiting.\n");
     return 0;
 }
 
 int ProtocolServer::processingCallback()
 {
-    auto waitDuration = std::chrono::milliseconds(PROCESSING_CV_TIMEOUT_MSEC * 10);
     int sentBytes = 0;
     while (processingRequests)
     {
         std::unique_lock<std::mutex> lock(serverRequestsMut);
         // can possibly replace with a non-tiumeout wait and push in some kind of 
         // signal entry (e.g. sock = -1) value to stop
-        if (!serverRequestsCV.wait_for(lock, waitDuration, [&] {return serverRequests.size() > 0; }))
-        {
-            Utility::platformLog("no requests...\n");
-            // periodically check we are still running
-            continue;
-        }
+        serverRequestsCV.wait(lock, [&] {return serverRequests.size() > 0; });
         ServerRequest request = serverRequests.front();
         serverRequests.pop();
         lock.unlock();
         //process request
+        if (Utility::isSocketInvalid(request.sock))
+        {
+            continue;
+        }
         Utility::platformLog("handling: %s\n", request.data.c_str());
         std::string response;
         // need to do anything different for error or not?
         commandHandler.handleCommand(request.data, response);
 
-        if (sentBytes = send(request.sock, response.c_str(), response.size(), 0) < 0)
+        if ((sentBytes = send(request.sock, response.c_str(), static_cast<int>(response.size()), 0)) < 0)
         {
             Utility::platformLog("got error trying to send on sock %d: %d\n", request.sock, errno);
             continue;
         }
-        if (sentBytes != response.size())
+        if (static_cast<size_t>(sentBytes) != response.size())
         {
             // if this is happening, will need to introduce send inside while loop 
             Utility::platformLog(
@@ -365,5 +371,6 @@ int ProtocolServer::processingCallback()
             continue;
         }
     }
+    Utility::platformLog("processing thread exiting.\n");
     return 0;
 }

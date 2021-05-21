@@ -60,7 +60,6 @@ namespace Utility
 		return ioctlsocket(sock, FIONBIO, &mode) == 0;
 #else
 		int flags = fcntl(sock, F_GETFL, 0);
-		int mask = 0;
 		if (flags == -1) return false;
 		if (blocking) flags = flags & ~O_NONBLOCK;
 		else flags = flags | O_NONBLOCK;
