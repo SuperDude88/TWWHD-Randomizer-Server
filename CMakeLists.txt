@@ -3,12 +3,11 @@ project(wwhd_rando_server CXX)
 
 if(DEFINED DEVKITPRO)
   include("${DEVKITPRO}/wut/share/wut.cmake" REQUIRED)
-  #set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES "${CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES} ${WUT_ROOT}/usr/include")
-  #message(STATUS "CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=${CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES}")
   add_definitions(-DDEVKITPRO)
 else()
   find_package(Threads REQUIRED)
 endif()
+
 
 if(CMAKE_USE_PTHREADS_INIT)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Werror -std=c++11")

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#ifdef PLATFORM_DKP
 #include <string>
 #include <vector>
 #include <coreinit/mcp.h>
@@ -78,3 +79,5 @@ namespace Utility {
     bool isDLC(MCPAppType type);
     bool isSystemApp(MCPAppType type);
 }
+
+#endif

@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <cstdint>
 
-#ifdef _MSC_VER
+#ifdef DEVKITPRO
+	#define PLATFORM_DKP
+#elif defined(_MSC_VER)
 	#define PLATFORM_MSVC
 #elif defined(__GNUC__) || defined(__GNUG__)
 	#define PLATFORM_GCC
@@ -14,9 +16,7 @@
 #else 
     #error UNKNOWN PLATFORM 
 #endif
-#ifdef DEVKITPRO
-	#define PLATFORM_DKP
-#endif
+
 
 // if this gets sufficiently extensive, we'll want to break out into different
 // target files/directories and use cmake to subtitute pre-makefile
