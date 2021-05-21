@@ -120,7 +120,6 @@ namespace Utility {
         Utility::platformLog("got MCPHandle: %d\n", mcpHandle);
         // Get titles from MCP
         Utility::platformLog("getting title count\n");
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         int32_t titleCount = MCP_TitleCount(mcpHandle);
         if(titleCount < 0)
         {
@@ -128,13 +127,11 @@ namespace Utility {
             return false;
         }
         Utility::platformLog("title count: %d\n", titleCount);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         uint32_t titleByteSize = titleCount * sizeof(struct MCPTitleListType);
         rawTitlesOut.resize(titleCount);
 
         uint32_t titlesListed = 0;
         Utility::platformLog("getting title list, titleByteSize=%u\n", titleByteSize);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         MCP_TitleList(mcpHandle, &titlesListed, rawTitlesOut.data(), titleByteSize);
 
         Utility::platformLog("title list acquired, count: %u\n", titlesListed);

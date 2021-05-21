@@ -3,6 +3,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstdint>
 
 #ifdef _MSC_VER
 	#define PLATFORM_MSVC

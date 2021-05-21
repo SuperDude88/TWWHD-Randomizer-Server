@@ -31,7 +31,7 @@ main(int argc, char** argv)
     {
         Utility::waitForPlatformStop();
         Utility::netShutdown();
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
         return 0;
     }
 

@@ -238,7 +238,7 @@ int ProtocolServer::receiveCallback()
         if (!pfds) // no clients case
         {
             //Utility::platformLog("waiting for clients...\n");
-            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC * 10)); // POLL_TIMEOUT_MSEC
+            std::this_thread::sleep_for(std::chrono::milliseconds(POLL_TIMEOUT_MSEC)); // POLL_TIMEOUT_MSEC
             continue;
         }
         // assemble poll file descriptor set
@@ -292,7 +292,7 @@ int ProtocolServer::receiveCallback()
                     bytesAvailable = sizeof(receivedData);
                 }
                 Utility::platformLog("attempting to recv %d bytes from sockfd %d\n", bytesAvailable, sock);
-                bytesReceived = recv(sock, receivedData, bytesAvailable, 0);
+                bytesReceived = recv(sock, receivedData, static_cast<int>(bytesAvailable), 0);
                 if (bytesReceived == 0) // TODO: orderly disconnect case
                 {
                     handleSocketDisconnect(sock);
@@ -354,7 +354,7 @@ int ProtocolServer::processingCallback()
         // need to do anything different for error or not?
         commandHandler.handleCommand(request.data, response);
 
-        if ((sentBytes = send(request.sock, response.c_str(), response.size(), 0)) < 0)
+        if ((sentBytes = send(request.sock, response.c_str(), static_cast<int>(response.size()), 0)) < 0)
         {
             Utility::platformLog("got error trying to send on sock %d: %d\n", request.sock, errno);
             continue;
