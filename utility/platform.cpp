@@ -10,14 +10,17 @@
 	#include <whb/log_console.h>
 	#include <coreinit/mcp.h>
 	#include <coreinit/thread.h>
-	#include "iosuhax.h"
-	#include "iosuhax_cfw.h"
-	#include "iosuhax_devoptab.h"
+	#include <iosuhax.h>
+	#include <iosuhax_cfw.h>
+	#include <iosuhax_devoptab.h>
+	#include "wiiutitles.hpp"
 	#define PRINTF_BUFFER_LENGTH 2048
 	static int32_t mcpHookHandle = -1;
 	static int32_t fsaHandle = -1;
 	static int32_t iosuhaxHandle = -1;
+	static bool iosuhaxOpen = false;
 	static bool systemMLCMounted = false;
+	static std::vector<Utility::titleEntry> wiiuTitlesList{};
 #endif 
 
 static bool _platformIsRunning = true;
@@ -67,14 +70,47 @@ namespace Utility
 #ifdef PLATFORM_DKP
 		WHBProcInit();
 		WHBLogConsoleInit();
-		if(!initIOSUHax())
+
+		// retrieve WiiU title information
+		std::vector<MCPTitleListType> rawTitles{};
+		if(!getRawTitles(rawTitles))
 		{
+			Utility::platformLog("unable to get raw titles\n");
+			platformShutdown();
 			return false;
 		}
-		// if(mount_fs("storage_mlc01", getFSAHandle(), NULL, "/vol/storage_mlc01") == 0)
-		// {
-		// 	systemMLCMounted = true;
-		// }
+
+		if(!initIOSUHax())
+		{
+			Utility::platformLog("unable to init IOSUHAX\n");
+			platformShutdown();
+			return false;
+		}
+		iosuhaxOpen = true;
+		if(mount_fs("storage_mlc01", getFSAHandle(), NULL, "/vol/storage_mlc01") != 0)
+		{
+			Utility::platformLog("unable to mount MLC\n");
+			platformShutdown();
+			return false;
+		}
+		systemMLCMounted = true;
+
+		if(!loadDetailedTitles(rawTitles, wiiuTitlesList))
+		{
+			Utility::platformLog("unable to load detailed titles\n");
+			platformShutdown();
+			return false;
+		}
+
+		// for debug
+		for (const auto& title : wiiuTitlesList)
+		{
+			if(title.normalizedTitle.find("The Wind Waker") != std::string::npos)
+			{
+				Utility::platformLog("TWW:HD found @ %s\n", title.base.path.c_str());
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+			}
+		}
 #else
 		signal(SIGINT, sigHandler);
 #ifdef SIGBREAK
@@ -104,13 +140,17 @@ namespace Utility
 	void platformShutdown()
 	{
 #ifdef PLATFORM_DKP
+		if (systemMLCMounted)
+		{
+			unmount_fs("storage_mlc01");
+		}
+		if (iosuhaxOpen)
+		{
+			closeIosuhax();
+		}
+		wiiuTitlesList.clear();
 		WHBLogConsoleFree();
 		WHBProcShutdown();
-		// if (systemMLCMounted)
-		// {
-		// 	unmount_fs("storage_mlc01");
-		// }
-		closeIosuhax();
 #endif
 	}
 
@@ -135,14 +175,14 @@ namespace Utility
 
 #ifdef PLATFORM_DKP
 void haxStartCallback(IOSError arg1, void *arg2) {
-	Utility::platformLog("hasStartCallback arg1 = %d\n", (int)arg1);
+	Utility::platformLog("hasStartCallback arg1 = %d, arg2 = %p\n", (int)arg1, (int)arg2);
 }
 
 
 bool initIOSUHax()
 {
 	Utility::platformLog("starting IOSUHax...\n");
-	auto family = IOSUHAX_CFW_Family();
+	auto family = IOSUHAX_CFW_GetFamily();
 	switch(family)
 	{
 	case IOSUHAX_CFW_MOCHA:
@@ -151,6 +191,8 @@ bool initIOSUHax()
 	case IOSUHAX_CFW_HAXCHIFW:
 		Utility::platformLog("detected HAXCHI CFW\n");
 		break;
+	case IOSUHAX_CFW_NO_CFW:
+		Utility::platformLog("no CFW detected\n");
 	default:
 		Utility::platformLog("unable to detect CFW family\n");
 		break;
@@ -160,11 +202,6 @@ bool initIOSUHax()
 		Utility::platformLog("MCP inaccessible\n");
 		return false;
 	}
-	// if(IOSUHAX_CFW_Available() == 0)
-	// {
-	// 	Utility::platformLog("IOSUHAX not available\n");
-	// 	return false;
-	// }
 
 	iosuhaxHandle = IOSUHAX_Open(nullptr);
 	if (iosuhaxHandle < 0) 
@@ -177,7 +214,7 @@ bool initIOSUHax()
 			return false;
 		}
 		IOS_IoctlAsync(mcpHookHandle, 0x62, nullptr, 0, nullptr, 0, haxStartCallback, (void*)0);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+		OSSleepTicks(OSSecondsToTicks(1));
 		if(IOSUHAX_Open("/dev/mcp") < 0)
 		{
 			MCP_Close(mcpHookHandle);
@@ -185,6 +222,7 @@ bool initIOSUHax()
 			Utility::platformLog("Unable to open iosuhax /dev/mcp\n");
 			return false;
 		}
+		OSSleepTicks(OSSecondsToTicks(5));
 	}
 
 	fsaHandle = IOSUHAX_FSA_Open();
@@ -194,18 +232,26 @@ bool initIOSUHax()
         return false;
     }
 
-	Utility::platformLog("IOSUHAX initialized\n");
+	Utility::platformLog("attempting to mount mlc\n");
+	if(mount_fs("storage_mlc01", fsaHandle, NULL, "/vol/storage_mlc01") < 0)
+	{
+		Utility::platformLog("failed to mount mlc: %d\n", errno);
+		OSSleepTicks(OSSecondsToTicks(1));
+		return false;
+	}
+
+	Utility::platformLog("IOSUHAX initialized, MLC mounted\n");
 	return true;
 }
 
 void closeIosuhax() {
 	if (fsaHandle >= 0) IOSUHAX_FSA_Close(fsaHandle);
 	if (iosuhaxHandle >= 0) IOSUHAX_Close();
-	OSSleepTicks(OSSecondsToTicks(1));
     if (mcpHookHandle >= 0) MCP_Close(mcpHookHandle);
     mcpHookHandle = -1;
     fsaHandle = -1;
     iosuhaxHandle = -1;
+	iosuhaxOpen = false;
 }
 
 #endif

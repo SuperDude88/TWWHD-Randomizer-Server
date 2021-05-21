@@ -29,40 +29,11 @@ main(int argc, char** argv)
     Utility::netInit();
     if(!Utility::platformInit())
     {
-        Utility::platformLog("Failed in platform init\n");
         Utility::waitForPlatformStop();
         Utility::netShutdown();
+        std::this_thread::sleep_for(std::chrono::seconds(5));
         return 0;
     }
-
-#ifdef PLATFORM_DKP
-    std::vector<MCPTitleListType> rawTitles{};
-    Utility::platformLog("Getting raw titles\n");
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    if (Utility::getRawTitles(rawTitles))
-    {
-        for (auto& title : rawTitles)
-        {
-            Utility::platformLog("titleId = %lld\n", title.titleId);
-        }
-        // std::vector<Utility::titleEntry> titles;
-        // if (Utility::loadDetailedTitles(rawTitles, titles))
-        // {
-        //     for (const auto& title : titles)
-        //     {
-        //         Utility::platformLog("title: %s\n", title.shortTitle.c_str());
-        //     }
-        // }
-        // else
-        // {
-        //     return waitAndCleanup("unable to load title info...");
-        // }
-    }
-    else
-    {
-        return waitAndCleanup("unable to get raw titles...");
-    }
-#endif
 
     ProtocolServer server(SERVER_TCP_PORT);
 

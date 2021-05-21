@@ -135,11 +135,16 @@ namespace Utility {
         uint32_t titlesListed = 0;
         Utility::platformLog("getting title list, titleByteSize=%u\n", titleByteSize);
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        MCP_TitleList(mcpHandle, &titlesListed, rawTitlesOut.data(), sizeof(struct MCPTitleListType));
+        MCP_TitleList(mcpHandle, &titlesListed, rawTitlesOut.data(), titleByteSize);
 
         Utility::platformLog("title list acquired, count: %u\n", titlesListed);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if(titlesListed != titleCount)
+        {
+            Utility::platformLog("Warning: Got %d titles when %d were expected\n", titlesListed, titleCount);
+        }
+
         MCP_Close(mcpHandle);
+        rawTitlesOut.resize(titlesListed);
 
         return true;
     }
