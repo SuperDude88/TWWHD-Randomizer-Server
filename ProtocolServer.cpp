@@ -16,7 +16,6 @@
 #include <chrono>
 
 constexpr long POLL_TIMEOUT_MSEC = 100; // 100 ms
-constexpr size_t PROCESSING_CV_TIMEOUT_MSEC = 100;
 constexpr size_t SOCKET_RECV_SIZE = 1024;
 
 ProtocolServer::ProtocolServer(uint16_t port) 

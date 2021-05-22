@@ -40,8 +40,10 @@ static void sigHandler(int signal)
 	}
 }
 
+#ifdef PLATFORM_DKP
 static bool initIOSUHax();
 static void closeIosuhax();
+#endif
 
 namespace Utility
 {

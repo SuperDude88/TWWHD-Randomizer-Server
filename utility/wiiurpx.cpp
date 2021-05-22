@@ -8,9 +8,13 @@
 #include <zlib.h>
 #include "wiiurpx.hpp"
 
-#pragma warning(disable : 4996)
+#ifdef PLATFOMR_MSVC
+    #pragma warning(disable : 4996)
+#endif
 
 using namespace std;
+
+static ulg pos;
 
 u16 Low2Big_u16(u16 a);
 u32 Low2Big_u32(u32 a);
@@ -18,9 +22,9 @@ u64 Low2Big_u64(u64 a);
 void fread16_BE(u16 &i, ifstream& f);
 void fread32_BE(u32 &i, ifstream& f);
 void fread64_BE(u64 &i, ifstream& f);
-void fwrite16_BE(u16 i, ifstream& f);
-void fwrite32_BE(u32 i, ifstream& f);
-void fwrite64_BE(u64 i, ifstream& f);
+void fwrite16_BE(u16 i, ofstream& f);
+void fwrite32_BE(u32 i, ofstream& f);
+void fwrite64_BE(u64 i, ofstream& f);
 u32 crc32_rpx(u32 crc, u8 *buff, u32 len);
 bool SortFunc(const Elf32_Shdr_Sort &v1, const Elf32_Shdr_Sort &v2);
 
@@ -28,10 +32,11 @@ namespace Utility {
     int rpx_decompress(ifstream& in, ofstream& out)
     {
         Elf32_Ehdr ehdr;
+        u32 magic = 0;
         for(u32 i = 0; i < 0x10; i++)
             ehdr.e_ident[i] = in.get();
-        tempa_u32 = ehdr.e_ident[0]<<24|ehdr.e_ident[1]<<16|ehdr.e_ident[2]<<8|ehdr.e_ident[3];
-        if(tempa_u32!=0x7F454C46) return -1;
+        magic = ehdr.e_ident[0]<<24|ehdr.e_ident[1]<<16|ehdr.e_ident[2]<<8|ehdr.e_ident[3];
+        if(magic!=0x7F454C46) return -1;
         fread16_BE(ehdr.e_type, in);
         if(ehdr.e_type != 0xFE01) return -1;
         fread16_BE(ehdr.e_machine, in);
@@ -68,7 +73,7 @@ namespace Utility {
         u32 *crcs = new u32[ehdr.e_shnum];
         vector< Elf32_Shdr_Sort > shdr_table_index;
         Elf32_Shdr *shdr_table = new Elf32_Shdr[ehdr.e_shnum];
-        while (out.tellp() < shdr_data_elf_offset) out.put(0);
+        while (static_cast<ulg>(out.tellp()) < shdr_data_elf_offset) out.put(0);
         in.seekg(ehdr.e_shoff);
         for (u32 i=0; i<ehdr.e_shnum; i++)
         {
@@ -120,11 +125,11 @@ namespace Utility {
                     data_size -= block_size;
                     in.read(buff_in, block_size);
                     strm.avail_in = in.gcount();
-                    strm.next_in = buff_in;
+                    strm.next_in = reinterpret_cast<Bytef*>(buff_in);
                     do
                     {
                         strm.avail_out = CHUNK;
-                        strm.next_out = buff_out;
+                        strm.next_out = reinterpret_cast<Bytef*>(buff_out);
                         inflate(&strm, Z_NO_FLUSH);
                         have = CHUNK - strm.avail_out;
                         out.write(buff_out, have);
@@ -186,8 +191,8 @@ namespace Utility {
         Elf32_Ehdr ehdr;
         for (u32 i = 0; i < 0x10; i++)
             ehdr.e_ident[i] = in.get();
-        tempa_u32 = ehdr.e_ident[0]<<24|ehdr.e_ident[1]<<16|ehdr.e_ident[2]<<8|ehdr.e_ident[3];
-        if(tempa_u32!=0x7F454C46) return -1;
+        u32 magic = ehdr.e_ident[0]<<24|ehdr.e_ident[1]<<16|ehdr.e_ident[2]<<8|ehdr.e_ident[3];
+        if(magic!=0x7F454C46) return -1;
         fread16_BE(ehdr.e_type, in);
         if(ehdr.e_type != 0xFE01) return -1;
         fread16_BE(ehdr.e_machine, in);
@@ -224,7 +229,7 @@ namespace Utility {
         u32 *crcs = new u32[ehdr.e_shnum];
         vector< Elf32_Shdr_Sort > shdr_table_index;
         Elf32_Shdr *shdr_table = new Elf32_Shdr[ehdr.e_shnum];
-        while(out.tellp() < shdr_data_elf_offset) out.put(0);
+        while(static_cast<ulg>(out.tellp()) < shdr_data_elf_offset) out.put(0);
         in.seekg(ehdr.e_shoff);
         for (u32 i=0; i<ehdr.e_shnum; i++)
         {
@@ -291,9 +296,9 @@ namespace Utility {
                     in.read(buff_in, block_size);
                     strm.avail_in = in.gcount();
                     crcs[shdr_index->index] = crc32_rpx(crcs[shdr_index->index], reinterpret_cast<u8*>(buff_in), block_size);
-                    strm.next_in = buff_in;
+                    strm.next_in = reinterpret_cast<Bytef*>(buff_in);
                     strm.avail_out = CHUNK;
-                    strm.next_out = buff_out;
+                    strm.next_out = reinterpret_cast<Bytef*>(buff_out);
                     deflate(&strm, Z_FINISH);
                     have = CHUNK - strm.avail_out;
                     if(have+4 < block_size)
@@ -326,10 +331,10 @@ namespace Utility {
                         in.read(buff_in, block_size);
                         strm.avail_in = in.gcount();
                         crcs[shdr_index->index] = crc32_rpx(crcs[shdr_index->index], reinterpret_cast<u8*>(buff_in), block_size);
-                        strm.next_in = buff_in;
+                        strm.next_in = reinterpret_cast<Bytef*>(buff_in);
                         do{
                             strm.avail_out = CHUNK;
-                            strm.next_out = buff_out;
+                            strm.next_out = reinterpret_cast<Bytef*>(buff_out);
                             deflate(&strm, flush);
                             have = CHUNK - strm.avail_out;
                             out.write(buff_out, have);
