@@ -309,7 +309,7 @@ namespace Utility {
                         shdr_table[shdr_index->index].sh_flags |= SHF_RPL_ZLIB;
                     }
                     else
-                        out.write(buff_out, block_size);
+                        out.write(buff_in, block_size);
                     deflateEnd(&strm);
                 }
                 else
