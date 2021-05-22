@@ -4,13 +4,10 @@
 #include <thread>
 #include <chrono>
 #include <cstring>
+#include <fstream>
 
 #include "ProtocolServer.hpp"
-
-#ifdef PLATFORM_DKP
-#include "utility/wiiutitles.hpp"
-#include <vector>
-#endif
+#include "utility/wiiurpx.hpp"
 
 #define SERVER_TCP_PORT 1234
 
@@ -34,6 +31,10 @@ main(int argc, char** argv)
         std::this_thread::sleep_for(std::chrono::seconds(3));
         return 0;
     }
+
+    std::ifstream rpx(R"~(E:\CEMU\GAMES\The Wind Waker HD\code\cking.rpx)~", std::ios::binary);
+    std::ofstream elf(R"~(C:\workspace\wiiu_hacks\temp\test.elf)~", std::ios::binary);
+    Utility::rpx_decompress(rpx, elf);
 
     ProtocolServer server(SERVER_TCP_PORT);
 

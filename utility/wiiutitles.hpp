@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "platform.hpp"
+
 #ifdef PLATFORM_DKP
 #include <string>
 #include <vector>

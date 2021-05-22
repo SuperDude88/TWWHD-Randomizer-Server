@@ -1,6 +1,5 @@
 
 #include "wiiutitles.hpp"
-#include "platform.hpp"
 
 #include <sys/types.h>
 #include <sys/stat.h>
