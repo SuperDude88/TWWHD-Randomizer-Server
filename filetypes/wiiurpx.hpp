@@ -1,6 +1,5 @@
 #pragma once
 
-#include "platform.hpp"
 #include <fstream>
 
 #define SHF_RPL_ZLIB	    0x08000000
@@ -28,17 +27,6 @@ typedef signed   int    s32;
 typedef unsigned long	ulg;
 typedef unsigned long long u64;
 typedef signed long long   s64;
-
-u8  tempa_u8,
-    tempb_u8;
-
-u16 tempa_u16,
-    tempb_u16;
-
-u32 tempa_u32,
-    tempb_u32;
-
-ulg pos;
 
 typedef struct {
 	u8  e_ident[0x10];
@@ -109,7 +97,7 @@ typedef struct {
 	u32 mTagsOffset;
 } Rpl_Fileinfo;
 
-namespace Utility {
-	int rpx_decompress(FILE *in, FILE *out);
-    int rpx_compress(FILE *in, FILE *out);
+namespace FileTypes {
+	int rpx_decompress(std::ifstream& in, std::ofstream& out);
+    int rpx_compress(std::ifstream& in, std::ofstream& out);
 }
