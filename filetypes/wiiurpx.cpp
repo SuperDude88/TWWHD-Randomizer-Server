@@ -28,7 +28,7 @@ void fwrite64_BE(u64 i, ofstream& f);
 u32 crc32_rpx(u32 crc, u8 *buff, u32 len);
 bool SortFunc(const Elf32_Shdr_Sort &v1, const Elf32_Shdr_Sort &v2);
 
-namespace Utility {
+namespace FileTypes {
     int rpx_decompress(ifstream& in, ofstream& out)
     {
         Elf32_Ehdr ehdr;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "platform.hpp"
 #include <fstream>
 
 #define SHF_RPL_ZLIB	    0x08000000
@@ -98,7 +97,7 @@ typedef struct {
 	u32 mTagsOffset;
 } Rpl_Fileinfo;
 
-namespace Utility {
+namespace FileTypes {
 	int rpx_decompress(std::ifstream& in, std::ofstream& out);
     int rpx_compress(std::ifstream& in, std::ofstream& out);
 }
