@@ -1,30 +1,92 @@
 #include "Commands.hpp"
 #include "../filetypes/wiiurpx.hpp"
+#include "../filetypes/yaz0.hpp"
+#include <fstream>
 
 namespace Commands {
-    bool getBinaryData(const std::string& filePath, size_t offset, size_t length, std::string& dataOut)
+    const char* getErrorName(CommandError err)
     {
-        return false;
+        switch(err)
+        {
+        case CommandError::NONE:
+            return "NONE";
+        case CommandError::CANNOT_OPEN_FILE:
+            return "CANNOT_OPEN_FILE";
+        case CommandError::EOF_REACHED:
+            return "EOF_REACHED";
+        case CommandError::RPX_OPERATION_FAILED:
+            return "RPX_OPERATION_FAILED";
+        case CommandError::YAZ0_OPERATION_FAILED:
+            return "YAZ0_OPERATION_FAILED";
+        case CommandError::UNKNOWN:
+            return "UNKNOWN";
+        case CommandError::COUNT:
+            return "COUNT";
+        default:
+            return "ILLEGAL";
+        }
     }
 
-    bool convertRPXToELF(const std::string& rpxPath, const std::string& outPath)
+    CommandError getBinaryData(const std::string& filePath, size_t offset, size_t length, char* dataOut)
     {
+        std::ifstream file(filePath.c_str(), std::ios::binary);
+        if (!file.is_open())
+        {
+            return CommandError::CANNOT_OPEN_FILE;
+        }
+        if (!file.seekg(offset))
+        {
+            return CommandError::EOF_REACHED;
+        }
 
-        return false;
+        if(!file.read(dataOut, length))
+        {
+            return CommandError::EOF_REACHED;
+        }
+        return CommandError::NONE;
     }
 
-    bool convertELFToRPX(const std::string& elfPath, const std::string& outPath)
+    CommandError convertRPXToELF(const std::string& rpxPath, const std::string& outPath)
     {
-        return false;
+        std::ifstream rpxFile(rpxPath);
+        if(!rpxFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        std::ofstream elfFile(outPath);
+        if(!elfFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        if(FileTypes::rpx_decompress(rpxFile, elfFile))
+        {
+            return CommandError::RPX_OPERATION_FAILED;
+        }
+        return CommandError::NONE;
     }
 
-    bool yaz0Decompress(std::istream& in, std::ostream& out)
+    CommandError convertELFToRPX(const std::string& elfPath, const std::string& outPath)
     {
-        return false;
+        std::ifstream elfFile(elfPath);
+        if(!elfFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        std::ofstream rpxFile(outPath);
+        if(!rpxFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        if(FileTypes::rpx_decompress(elfFile, rpxFile))
+        {
+            return CommandError::RPX_OPERATION_FAILED;
+        }
+        return CommandError::NONE;
     }
 
-    bool yaz0Compress(std::istream& in, std::ostream& out)
+    CommandError yaz0Decompress(std::istream& in, std::ostream& out)
     {
-        return false;
+        if(!FileTypes::yaz0Decode(in, out))
+        {
+            return CommandError::YAZ0_OPERATION_FAILED;
+        }
+        return CommandError::NONE;
+    }
+
+    CommandError yaz0Compress(std::istream& in, std::ostream& out)
+    {
+        if(!FileTypes::yaz0Encode(in, out))
+        {
+            return CommandError::YAZ0_OPERATION_FAILED;
+        }
+        return CommandError::NONE;
     }
 }
