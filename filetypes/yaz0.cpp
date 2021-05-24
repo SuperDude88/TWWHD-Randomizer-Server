@@ -26,9 +26,9 @@ bool readYaz0Header(std::istream& in, Yaz0Header& header)
 }
 
 // simple and straight encoding scheme for Yaz0
-uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut)
+uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
 {
-  int startPos = pos - 0x1000;
+  int startPos = pos - searchRange;
   int i, j;
   uint32_t numBytes = 1;
   uint32_t matchPos = 0;
@@ -55,9 +55,9 @@ uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut)
 }
 
 // a lookahead encoding scheme for ngc Yaz0
-uint32_t nintendoEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut)
+uint32_t nintendoEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
 {
-  int startPos = pos - 0x1000;
+  int startPos = pos - searchRange;
   uint32_t numBytes = 1;
   static uint32_t numBytes1;
   static uint32_t matchPos;
@@ -71,12 +71,12 @@ uint32_t nintendoEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOu
     return numBytes1;
   }
   prevFlag = 0;
-  numBytes = simpleEnc(src, size, pos, matchPos);
+  numBytes = simpleEnc(src, size, pos, matchPos, searchRange);
   matchPosOut = matchPos;
 
   // if this position is RLE encoded, then compare to copying 1 byte and next position(pos+1) encoding
   if (numBytes >= 3) {
-    numBytes1 = simpleEnc(src, size, pos+1, matchPos);
+    numBytes1 = simpleEnc(src, size, pos+1, matchPos, searchRange);
     // if the next position encoding is +2 longer than current position, choose it.
     // this does not guarantee the best optimization, but fairly good optimization with speed.
     if (numBytes1 >= numBytes + 2) {
@@ -93,7 +93,7 @@ struct Ret
 };
 
 
-int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out)
+int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out, uint32_t level = 9)
 {
     Ret r = { 0, 0 };
     uint8_t dst[24];    // 8 codes * 3 bytes maximum
@@ -101,13 +101,19 @@ int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out)
     
     uint32_t validBitCount = 0; //number of valid bits left in "code" byte
     uint8_t currCodeByte = 0;
+    int searchRange = MAX_SEARCH_RANGE;
+    if (level > 0 && level < 9)
+    {
+        searchRange >>= (9 - level);
+    }
+
     while(r.srcPos < srcSize)
     {
         uint32_t numBytes;
         uint32_t matchPos;
         uint32_t srcPosBak;
 
-        numBytes = nintendoEnc(src, srcSize, r.srcPos, matchPos);
+        numBytes = nintendoEnc(src, srcSize, r.srcPos, matchPos, searchRange);
         if (numBytes < 3)
         {
             //straight copy
@@ -228,7 +234,7 @@ bool yaz0DataDecode(const char* in, char* out, uint32_t outTotalSize)
 }
 
 namespace FileTypes {
-    bool yaz0Encode(std::istream& in, std::ostream& out)
+    uint32_t yaz0Encode(std::istream& in, std::ostream& out, int compressionLevel)
     {
         char readChunkBuf[READ_CHUNK_SIZE];
         std::string inData{};
@@ -248,12 +254,10 @@ namespace FileTypes {
         out.write(reinterpret_cast<char*>(&outDataSize), 4);
         out.write(dummyData, 8);
 
-        yaz0DataEncode(reinterpret_cast<const uint8_t*>(inData.data()), dataSize, out);
-
-        return true;
+        return yaz0DataEncode(reinterpret_cast<const uint8_t*>(inData.data()), dataSize, out, compressionLevel);
     }
 
-    bool yaz0Decode(std::istream& in, std::ostream& out)
+    uint32_t yaz0Decode(std::istream& in, std::ostream& out)
     {
         char readChunkBuf[READ_CHUNK_SIZE];
         std::string inData{};
@@ -262,7 +266,7 @@ namespace FileTypes {
 
         if(!readYaz0Header(in, header))
         {
-            return false;
+            return 0;
         }
 
         // TODO: for now we are reading entire file into memory
@@ -282,11 +286,11 @@ namespace FileTypes {
         char* outData = new char[header.uncompressedSize];
         if(!yaz0DataDecode(inData.data(), outData, header.uncompressedSize))
         {
-            return false;
+            return 0;
         }
         out.write(outData, header.uncompressedSize);
 
         delete[] outData;
-        return true;
+        return header.uncompressedSize;
     }
 }

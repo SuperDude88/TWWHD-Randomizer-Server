@@ -4,6 +4,6 @@
 #include <iostream>
 
 namespace FileTypes {
-    bool yaz0Encode(std::istream& in, std::ostream& out);
-    bool yaz0Decode(std::istream& in, std::ostream& out);
+    uint32_t yaz0Encode(std::istream& in, std::ostream& out, int compressionLevel = 9);
+    uint32_t yaz0Decode(std::istream& in, std::ostream& out);
 }
