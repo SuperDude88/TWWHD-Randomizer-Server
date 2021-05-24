@@ -356,6 +356,15 @@ namespace FileTypes {
             spec.fileLength = node.nodeDataEnd - node.nodeDataOffset;
             files.emplace_back(spec);
         }
+
+        // sort file specs by offset (may already be sorted by nintendo, but they
+        // don't HAVE to be in theory)
+        std::sort(
+            files.begin(), 
+            files.end(), 
+            [](const SARCFileSpec& l, const SARCFileSpec& r) {return l.fileOffset < r.fileOffset;}
+        );
+
         sarc.seekg(sarcHeader.dataStartOffset);
         if(headerOnly)
         {
@@ -366,12 +375,6 @@ namespace FileTypes {
 
         uint32_t remainingData = sarcHeader.fileSize - sarcHeader.dataStartOffset;
         fileData.resize(remainingData);
-        // no (extra) copy read into pre-alloc'd string
-        // std::copy_n(
-        //     std::istream_iterator<char>(sarc), 
-        //     100, 
-        //     std::insert_iterator<std::string>(fileData, fileData.begin())
-        // );
         if(!sarc.read(&fileData[0], remainingData))
         {
             return SARCError::REACHED_EOF;
@@ -487,17 +490,68 @@ namespace FileTypes {
         uint32_t padSize = dataStartOffset;
         padSize -= out.tellp();
         std::fill_n(std::ostream_iterator<char>(out), padSize, '\0');
-        out.write(fileData.data(), fileData.size());
+        if(!out.write(fileData.data(), fileData.size()))
+        {
+            return SARCError::REACHED_EOF;
+        }
 
-        return SARCError::UNKNOWN;
+        return SARCError::NONE;
     }
 
     SARCError SARCFile::writeToFile(const std::string& outFilePath)
     {
-        return SARCError::UNKNOWN;
+        std::ofstream outFile(outFilePath);
+        if(!outFile.is_open())
+        {
+            return SARCError::COULD_NOT_OPEN;
+        }
+        return writeToStream(outFile);
+    }
+
+    uint32_t SARCFile::insertIntoStringList(std::string str)
+    {
+        StringTableEntry newEntry;
+        newEntry.str = str;
+        auto maxOffEntryIt = std::max_element(
+            stringTable.begin(), 
+            stringTable.end(), 
+            [](const StringTableEntry& l, const StringTableEntry& r) {return l.offset < r.offset;}
+        );
+        const auto& maxOffEntry = *maxOffEntryIt;
+        uint16_t endOfPrev = maxOffEntry.offset;
+        // add one for null terminator
+        endOfPrev += maxOffEntry.str.length() + 1;
+        // add whatever was needed before for 4 byte alignment
+        endOfPrev += endOfPrev % 4;
+        newEntry.offset = endOfPrev;
+        stringTable.push_back(newEntry);
+        return newEntry.offset;
     }
 
     SARCError SARCFile::addFile(const std::string& fileName, std::istream& fileData)
+    {
+        // incomplete impl of adding a file
+        return SARCError::UNKNOWN;
+        // SFATNode newNode;
+        // sfatHeader.nodeCount += 1;
+        // newNode.fileNameHash = SFATNameHash(fileName.data(), fileName.length(), sfatHeader.hashKey_0x65);
+        // auto newEntryOffset = insertIntoStringList(filename);
+        // // offset is divided by 4 in file attributes
+        // newEntryOffset /= 4;
+        // newNode.fileAttributes = 0x01000000 | newEntryOffset;
+        // // we guarantee the file spec list is sorted during reading
+        // auto trailingFile = files.back();
+        // newNode.nodeDataOffset = trailingFile.fileOffset + trailingFile.fileLength;
+        // // 4 byte align, although the "standard" is non-specific
+        // newNode.nodeDataOffset += newNode.nodeDataOffset % 4;
+        // // add data to end of data string (with 4 byte alignment)
+        // // to find out what node end offset is
+        // nodes.push_back(newNode);
+
+        // return SARCError::NONE;
+    }
+
+    SARCError SARCFile::removeFile(const std::string& fileName)
     {
         return SARCError::UNKNOWN;
     }
