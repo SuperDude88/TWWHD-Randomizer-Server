@@ -6,6 +6,7 @@
 
 constexpr uint32_t READ_CHUNK_SIZE = 4096;
 constexpr uint32_t MAX_SEARCH_RANGE = 0x1000;
+constexpr uint32_t MAX_ENCODED_SIZE = 0x111; 
 
 struct Yaz0Header 
 {
@@ -26,65 +27,89 @@ bool readYaz0Header(std::istream& in, Yaz0Header& header)
 }
 
 // simple and straight encoding scheme for Yaz0
-uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
+inline uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
 {
-  int startPos = pos - searchRange;
-  int i, j;
-  uint32_t numBytes = 1;
-  uint32_t matchPos = 0;
+    int startPos = pos - searchRange;
+    int i = 0, runLen = 0, maxRunLen;
+    // numBytes is length of best match found
+    uint32_t numBytes = 1;
+    // matchPos is position of start of best match found
+    uint32_t matchPos = 0;
 
-  if (startPos < 0)
-    startPos = 0;
-  for (i = startPos; i < pos; i++)
-  {
-    for (j = 0; j < size - pos; j++)
+    maxRunLen = MAX_ENCODED_SIZE;
+    // if we could possibly fall off the end of the file, 
+    // max run len is the remaining bytes
+    if (maxRunLen + pos > size)
     {
-      if (src[i + j] != src[j + pos])
-        break;
+        maxRunLen = size - pos;
     }
-    if (j > numBytes)
+    // don't bother if we're right at the end of the file
+    if (maxRunLen < 3)
     {
-      numBytes = j;
-      matchPos = i;
+        return 1;
     }
-  }
-  matchPosOut = matchPos;
-  if (numBytes == 2)
-    numBytes = 1;
-  return numBytes;
+
+    if (startPos < 0)
+    {
+        startPos = 0;
+    }
+    for (i = startPos; i < pos; i++)
+    {
+        // loop unwind pre-check
+        if (src[i] == src[pos] && src[i + 1] == src[pos + 1] && src[i + 2] == src[pos + 2])
+        {
+            for (runLen = 3; runLen < maxRunLen; runLen++)
+            {
+                if (src[i + runLen] != src[pos + runLen])
+                break;
+            }
+        }
+        // if we have found a longer copy match
+        if (runLen > numBytes)
+        {
+            numBytes = runLen;
+            matchPos = i;
+        }
+    }
+    matchPosOut = matchPos;
+    if (numBytes == 2)
+    {
+        numBytes = 1;
+    }
+    return numBytes;
 }
 
 // a lookahead encoding scheme for ngc Yaz0
 uint32_t nintendoEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
 {
-  int startPos = pos - searchRange;
-  uint32_t numBytes = 1;
-  static uint32_t numBytes1;
-  static uint32_t matchPos;
-  static int prevFlag = 0;
+    int startPos = pos - searchRange;
+    uint32_t numBytes = 1;
+    static uint32_t numBytes1;
+    static uint32_t matchPos;
+    static int prevFlag = 0;
 
-  // if prevFlag is set, it means that the previous position was determined by look-ahead try.
-  // so just use it. this is not the best optimization, but nintendo's choice for speed.
-  if (prevFlag == 1) {
-    matchPosOut = matchPos;
-    prevFlag = 0;
-    return numBytes1;
-  }
-  prevFlag = 0;
-  numBytes = simpleEnc(src, size, pos, matchPos, searchRange);
-  matchPosOut = matchPos;
-
-  // if this position is RLE encoded, then compare to copying 1 byte and next position(pos+1) encoding
-  if (numBytes >= 3) {
-    numBytes1 = simpleEnc(src, size, pos+1, matchPos, searchRange);
-    // if the next position encoding is +2 longer than current position, choose it.
-    // this does not guarantee the best optimization, but fairly good optimization with speed.
-    if (numBytes1 >= numBytes + 2) {
-      numBytes = 1;
-      prevFlag = 1;
+    // if prevFlag is set, it means that the previous position was determined by look-ahead try.
+    // so just use it. this is not the best optimization, but nintendo's choice for speed.
+    if (prevFlag == 1) {
+        matchPosOut = matchPos;
+        prevFlag = 0;
+        return numBytes1;
     }
-  }
-  return numBytes;
+    prevFlag = 0;
+    numBytes = simpleEnc(src, size, pos, matchPos, searchRange);
+    matchPosOut = matchPos;
+
+    // if this position is RLE encoded, then compare to copying 1 byte and next position(pos+1) encoding
+    if (numBytes >= 3) {
+        numBytes1 = simpleEnc(src, size, pos+1, matchPos, searchRange);
+        // if the next position encoding is +2 longer than current position, choose it.
+        // this does not guarantee the best optimization, but fairly good optimization with speed.
+        if (numBytes1 >= numBytes + 2) {
+            numBytes = 1;
+            prevFlag = 1;
+        }
+    }
+    return numBytes;
 }
 
 struct Ret
@@ -110,6 +135,7 @@ int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out, uint32_t 
     while(r.srcPos < srcSize)
     {
         uint32_t numBytes;
+        //uint32_t rleNumBytes;
         uint32_t matchPos;
         uint32_t srcPosBak;
 
