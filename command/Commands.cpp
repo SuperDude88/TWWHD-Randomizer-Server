@@ -30,10 +30,8 @@ namespace Commands {
     CommandError getBinaryData(const std::string& filePath, size_t offset, size_t length, char* dataOut)
     {
         std::ifstream file(filePath.c_str(), std::ios::binary);
-        if (!file.is_open())
-        {
-            return CommandError::CANNOT_OPEN_FILE;
-        }
+        if (!file.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        
         if (!file.seekg(offset))
         {
             return CommandError::EOF_REACHED;
@@ -43,6 +41,16 @@ namespace Commands {
         {
             return CommandError::EOF_REACHED;
         }
+        return CommandError::NONE;
+    }
+
+    CommandError replaceBinaryData(const std::string& filePath, size_t offset, std::string replaceWith)
+    {
+        auto mode = std::ios::binary | std::ios::in | std::ios::out;
+        std::ofstream file(filePath.c_str(), mode);
+        if (!file.is_open()) return CommandError::CANNOT_OPEN_FILE;
+        if (!file.seekp(offset)) return CommandError::EOF_REACHED;
+        if(!file.write(replaceWith.data(), replaceWith.size())) return CommandError::EOF_REACHED;
         return CommandError::NONE;
     }
 
