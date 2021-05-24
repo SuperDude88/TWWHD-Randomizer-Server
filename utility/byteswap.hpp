@@ -27,4 +27,22 @@ namespace Utility
     {
         value = byteswap(value);
     }
+
+    template<typename T>
+    inline T byte_align_offset(T toAlign, T alignment = sizeof(T))
+    {
+        T mod = toAlign % alignment;
+        if(mod == 0)
+        {
+            return 0;
+        }
+        return alignment - mod;
+    }
+
+    template<typename T>
+    inline T byte_align(T toAlign, T alignment = sizeof(T))
+    {
+        
+        return toAlign + byte_align_offset(toAlign, alignment);
+    }
 }

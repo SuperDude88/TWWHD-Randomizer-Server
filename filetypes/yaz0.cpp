@@ -6,9 +6,6 @@
 
 constexpr uint32_t READ_CHUNK_SIZE = 4096;
 constexpr uint32_t MAX_SEARCH_RANGE = 0x1000;
-constexpr uint32_t SEARCH_RANGE_MAX_LEVEL = 0x10e0;
-constexpr uint32_t SEARCH_RANGE_OFFSET = 0x0e0;
-constexpr uint32_t RUN_MAX_LEN = 0x111;
 
 struct Yaz0Header 
 {
@@ -253,7 +250,7 @@ namespace FileTypes {
 
         yaz0DataEncode(reinterpret_cast<const uint8_t*>(inData.data()), dataSize, out);
 
-        return false;
+        return true;
     }
 
     bool yaz0Decode(std::istream& in, std::ostream& out)

@@ -442,17 +442,16 @@ namespace FileTypes {
         if (isEmpty) return SARCError::HEADER_DATA_NOT_LOADED;
         // determine current output file size and start of data segment
         uint32_t fileSize = 0, dataStartOffset = 0;
-        fileSize += sarcHeader.headerLength_0x14;
-        fileSize += sfatHeader.headerLength_0xC;
-        fileSize += sfatHeader.nodeCount * sizeof(SFATNode);
-        fileSize += sfntHeader.headerLength_0x8;
-        dataStartOffset = fileSize;
+        dataStartOffset += sarcHeader.headerLength_0x14;
+        dataStartOffset += sfatHeader.headerLength_0xC;
+        dataStartOffset += sfatHeader.nodeCount * sizeof(SFATNode);
+        dataStartOffset += sfntHeader.headerLength_0x8;
+        // nintendo seems to pad file offsets to nearest 0x2000, so we can't just
+        // sum filesizes
         for (const auto& fileSpec : files)
         {
             uint32_t filenameLen = fileSpec.fileName.size() + 1;
-            filenameLen += filenameLen % 4; // 4 byte align
-            fileSize += filenameLen;
-            fileSize += fileSpec.fileLength;
+            filenameLen = Utility::byte_align<uint32_t>(filenameLen);
             dataStartOffset += filenameLen;
         }
 
@@ -462,8 +461,10 @@ namespace FileTypes {
         {
             auto toAdd = minDataOffset - dataStartOffset;
             dataStartOffset = minDataOffset;
-            fileSize += toAdd;
         }
+        fileSize = dataStartOffset;
+        const auto& lastFile = files.back();
+        fileSize += lastFile.fileOffset + lastFile.fileLength;
 
         sarcHeader.fileSize = fileSize;
         sarcHeader.dataStartOffset = dataStartOffset;
@@ -481,10 +482,14 @@ namespace FileTypes {
         for (const auto& fileSpec : files)
         {
             std::string byteAligned{fileSpec.fileName};
-            // add one to handle null terminator
-            uint32_t toAppend = (byteAligned.size() + 1) % 4;
-            byteAligned.append('\0', toAppend);
-            out << byteAligned.c_str();
+            // add null terminator to calc is correct
+            byteAligned.append(1, '\0');
+            uint32_t toAppend = Utility::byte_align_offset<uint32_t>(byteAligned.size());
+            byteAligned.append(toAppend, '\0');
+            if(!out.write(byteAligned.data(), byteAligned.size()))
+            {
+                return SARCError::REACHED_EOF;
+            }
         }
 
         uint32_t padSize = dataStartOffset;
@@ -520,9 +525,9 @@ namespace FileTypes {
         const auto& maxOffEntry = *maxOffEntryIt;
         uint16_t endOfPrev = maxOffEntry.offset;
         // add one for null terminator
-        endOfPrev += maxOffEntry.str.length() + 1;
+        endOfPrev += maxOffEntry.str.length();
         // add whatever was needed before for 4 byte alignment
-        endOfPrev += endOfPrev % 4;
+        endOfPrev += Utility::byte_align_offset<uint32_t>(endOfPrev);
         newEntry.offset = endOfPrev;
         stringTable.push_back(newEntry);
         return newEntry.offset;
@@ -541,6 +546,7 @@ namespace FileTypes {
         // newNode.fileAttributes = 0x01000000 | newEntryOffset;
         // // we guarantee the file spec list is sorted during reading
         // auto trailingFile = files.back();
+        // // TODO: do we want to 0x2000 byte align like nintendo does?
         // newNode.nodeDataOffset = trailingFile.fileOffset + trailingFile.fileLength;
         // // 4 byte align, although the "standard" is non-specific
         // newNode.nodeDataOffset += newNode.nodeDataOffset % 4;
