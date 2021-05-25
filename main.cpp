@@ -8,6 +8,7 @@
 #include <fstream>
 
 #include "ProtocolServer.hpp"
+#include "filetypes/wiiurpx.hpp"
 
 #define SERVER_TCP_PORT 1234
 
@@ -30,6 +31,24 @@ main(int argc, char** argv)
         Utility::netShutdown();
         std::this_thread::sleep_for(std::chrono::seconds(3));
         return 0;
+    }
+
+    std::ifstream ifile(R"~(C:\workspace\temp\cking.rpx)~", std::ios::binary);
+    int err;
+
+    if (!ifile.is_open())
+    {
+        Utility::platformLog("unable to open cking.rpx\n");
+    }
+    else
+    {
+        if ((err = FileTypes::rpx_decompress(
+            ifile,
+            std::ofstream(R"~(C:\workspace\temp\cking.rpx.dec2)~", std::ios::binary)
+        )))
+        {
+            Utility::platformLog("err: %d\n", err);
+        }
     }
 
     ProtocolServer server(SERVER_TCP_PORT);
