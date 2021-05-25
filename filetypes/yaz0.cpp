@@ -27,10 +27,11 @@ bool readYaz0Header(std::istream& in, Yaz0Header& header)
 }
 
 // simple and straight encoding scheme for Yaz0
-inline uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
+inline uint32_t simpleEnc(const uint8_t* src, uint32_t size, int pos, uint32_t& matchPosOut, int searchRange)
 {
     int startPos = pos - searchRange;
-    int i = 0, runLen = 0, maxRunLen;
+    int i = 0;
+    uint32_t runLen = 0, maxRunLen;
     // numBytes is length of best match found
     uint32_t numBytes = 1;
     // matchPos is position of start of best match found
@@ -85,7 +86,6 @@ inline uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& match
 // a lookahead encoding scheme for ngc Yaz0
 uint32_t nintendoEnc(const uint8_t* src, int size, int pos, uint32_t& matchPosOut, int searchRange)
 {
-    int startPos = pos - searchRange;
     uint32_t numBytes = 1;
     static uint32_t numBytes1;
     static uint32_t matchPos;
@@ -139,7 +139,6 @@ int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out, uint32_t 
     {
         uint32_t numBytes;
         uint32_t matchPos;
-        uint32_t srcPosBak;
 
         numBytes = nintendoEnc(src, srcSize, r.srcPos, matchPos, searchRange);
         if (numBytes < 3)
@@ -188,7 +187,6 @@ int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out, uint32_t 
             out.write(reinterpret_cast<char*>(dst), r.dstPos);
             dstSize += r.dstPos+1;
 
-            srcPosBak = r.srcPos;
             currCodeByte = 0;
             validBitCount = 0;
             r.dstPos = 0;
