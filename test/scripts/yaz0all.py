@@ -41,7 +41,7 @@ def clean_files(files):
         try:
             os.remove(file)
         except OSError:
-            pass
+            print(f"couldn't delete file: {file}")
 
 
 def main(args):
@@ -53,9 +53,12 @@ def main(args):
     result = vars(parser.parse_args(args))
     out_dir = result['out_directory']
     autoclean = result['autoclean']
+    file_list = result['files']
+    if len(file_list) == 1 and os.path.isdir(file_list[0]):
+        file_list = [os.path.join(file_list[0], f) for f in os.listdir(file_list[0])]
+        file_list = list(filter(lambda f: os.path.isfile, file_list))
     os.makedirs(out_dir, exist_ok=True)
-    print(result)
-    for file in result['files']:
+    for file in file_list:
         success, generated_files = call_yaz0test(result['yaz0test'], file, out_dir)
         if not success:
             print(f'failed on file {file}')
