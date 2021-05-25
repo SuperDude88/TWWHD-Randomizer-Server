@@ -77,7 +77,7 @@ namespace FileTypes {
         vector< Elf32_Shdr_Sort > shdr_table_index;
         Elf32_Shdr *shdr_table = new Elf32_Shdr[ehdr.e_shnum];
         while (static_cast<ulg>(out.tellp()) < shdr_data_elf_offset) out.put(0);
-        if (!in.seekg(ehdr.e_shoff)) return 1;
+        if (!in.seekg(ehdr.e_shoff)) return -1;
         for (u32 i=0; i<ehdr.e_shnum; i++)
         {
             crcs[i] = 0;
@@ -105,7 +105,7 @@ namespace FileTypes {
             pos = shdr_table[shdr_index->index].sh_offset;
             if (!in.seekg(pos))
             {
-                return 1;
+                return -1;
             }
             shdr_table[shdr_index->index].sh_offset = out.tellp();
             if((shdr_table[shdr_index->index].sh_flags & SHF_RPL_ZLIB) == SHF_RPL_ZLIB)
@@ -127,7 +127,7 @@ namespace FileTypes {
                 {
                     return err;
                 }
-                while(data_size>0)
+                while(data_size > 0)
                 {
                     block_size = CHUNK;
                     if(data_size<block_size)
@@ -164,7 +164,7 @@ namespace FileTypes {
                 {
                     char data[CHUNK];
                     block_size = CHUNK;
-                    if(data_size<block_size)
+                    if(data_size < block_size)
                         block_size = data_size;
                     data_size -= block_size;
                     in.read(data, block_size);

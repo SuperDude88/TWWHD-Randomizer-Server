@@ -2,4 +2,4 @@ build/*
 out/*
 .vs/*
 .cache/*
-test/*
+.vscode/*

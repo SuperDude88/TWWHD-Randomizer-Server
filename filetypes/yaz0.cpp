@@ -61,14 +61,17 @@ inline uint32_t simpleEnc(const uint8_t* src, int size, int pos, uint32_t& match
             for (runLen = 3; runLen < maxRunLen; runLen++)
             {
                 if (src[i + runLen] != src[pos + runLen])
-                break;
+                {
+                    break;
+                }
             }
-        }
-        // if we have found a longer copy match
-        if (runLen > numBytes)
-        {
-            numBytes = runLen;
-            matchPos = i;
+
+            // if we have found a longer copy match
+            if (runLen > numBytes)
+            {
+                numBytes = runLen;
+                matchPos = i;
+            }
         }
     }
     matchPosOut = matchPos;
@@ -135,7 +138,6 @@ int yaz0DataEncode(const uint8_t* src, int srcSize, std::ostream& out, uint32_t 
     while(r.srcPos < srcSize)
     {
         uint32_t numBytes;
-        //uint32_t rleNumBytes;
         uint32_t matchPos;
         uint32_t srcPosBak;
 
