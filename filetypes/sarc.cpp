@@ -272,7 +272,7 @@ namespace FileTypes {
         }
         isEmpty = false;
         // init sarc header
-        std::strncpy(sarcHeader.magicSARC, "SARC", 4);
+        std::memcpy(sarcHeader.magicSARC, "SARC", 4);
         sarcHeader.headerLength_0x14 = 0x14;
         sarcHeader.byteOrderMarker = 0xFEFF;
         sarcHeader.fileSize = 0;
@@ -280,12 +280,12 @@ namespace FileTypes {
         sarcHeader.versionNumber_0x0100 = 0x0100;
         std::memset(sarcHeader._unused, '\0', 2);
         // init SFAT Header
-        std::strncpy(sfatHeader.magicSFAT, "SFAT", 4);
+        std::memcpy(sfatHeader.magicSFAT, "SFAT", 4);
         sfatHeader.headerLength_0xC = 0xC;
         sfatHeader.nodeCount = 0;
         sfatHeader.hashKey_0x65 = 0x65;
         // init SFNT header
-        std::strncpy(sfntHeader.magicSFNT, "SFNT", 4);
+        std::memcpy(sfntHeader.magicSFNT, "SFNT", 4);
         sfntHeader.headerLength_0x8 = 0x8;
         std::memset(sfntHeader._unused, '\0', 2);
         return SARCError::NONE;
@@ -321,10 +321,6 @@ namespace FileTypes {
         if((err = readSFATStringTable(sarc, stringTable, stringTableStartOffset, fileDataStartOffset)) != SARCError::NONE)
         {
             return err;
-        }
-        for (const auto& entry : stringTable)
-        {
-            uint32_t offset = entry.offset;
         }
 
         for(const auto& node : nodes)
@@ -459,7 +455,6 @@ namespace FileTypes {
         // possibly to make computing the string table stuff simpler
         if (dataStartOffset < minDataOffset)
         {
-            auto toAdd = minDataOffset - dataStartOffset;
             dataStartOffset = minDataOffset;
         }
         fileSize = dataStartOffset;
@@ -482,7 +477,7 @@ namespace FileTypes {
         for (const auto& fileSpec : files)
         {
             std::string byteAligned{fileSpec.fileName};
-            // add null terminator to calc is correct
+            // add null terminator so calc is correct
             byteAligned.append(1, '\0');
             uint32_t toAppend = Utility::byte_align_offset<uint32_t>(byteAligned.size());
             byteAligned.append(toAppend, '\0');
