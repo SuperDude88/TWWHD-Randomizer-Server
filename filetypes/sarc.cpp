@@ -209,7 +209,10 @@ SARCError readSFATStringTable(std::istream& sfat, std::vector<StringTableEntry>&
         {
             return SARCError::STRING_TOO_LONG;
         }
-        std::string str(buffer, sfat.gcount());
+        // n.b. getline() extracts and counts the delimiter character, but 
+        // doesn't put it in buffer. A null character is also always added
+        // so in our case we do gcount() - 1 to not include the null
+        std::string str(buffer, sfat.gcount() - 1);
         out.emplace_back(StringTableEntry{stringOffset, str});
         char next = 0;
         // continue until non-null character, as strings may be 
@@ -341,12 +344,11 @@ namespace FileTypes {
             {
                 return SARCError::STRING_NOT_FOUND;
             }
-            // ignore hash checks for now, as hashes seem to mismatch but filenames are correct
-            // auto hash = SFATNameHash(match->str.c_str(), match->str.size(), sfatHeader.hashKey_0x65);
-            // if (hash != node.fileNameHash)
-            // {
-            //     return SARCError::FILENAME_HASH_MISMATCH;
-            // }
+            auto hash = SFATNameHash(match->str.data(), match->str.size(), sfatHeader.hashKey_0x65);
+            if (hash != node.fileNameHash)
+            {
+                return SARCError::FILENAME_HASH_MISMATCH;
+            }
             spec.fileName = match->str;
             spec.fileOffset = node.nodeDataOffset;
             spec.fileLength = node.nodeDataEnd - node.nodeDataOffset;
@@ -385,7 +387,7 @@ namespace FileTypes {
         return SARCError::NONE;
     }
 
-    SARCError SARCFile::loadFromFile(std::string filePath, bool headerOnly)
+    SARCError SARCFile::loadFromFile(const std::string& filePath, bool headerOnly)
     {
         std::ifstream file(filePath);
         if(!file.is_open())
@@ -528,28 +530,58 @@ namespace FileTypes {
         return newEntry.offset;
     }
 
-    SARCError SARCFile::addFile(const std::string& fileName, std::istream& fileData)
+    SARCError SARCFile::addFile(const std::string& fileName, std::istream& inputData)
     {
-        // incomplete impl of adding a file
-        return SARCError::UNKNOWN;
-        // SFATNode newNode;
-        // sfatHeader.nodeCount += 1;
-        // newNode.fileNameHash = SFATNameHash(fileName.data(), fileName.length(), sfatHeader.hashKey_0x65);
-        // auto newEntryOffset = insertIntoStringList(filename);
-        // // offset is divided by 4 in file attributes
-        // newEntryOffset /= 4;
-        // newNode.fileAttributes = 0x01000000 | newEntryOffset;
-        // // we guarantee the file spec list is sorted during reading
-        // auto trailingFile = files.back();
-        // // TODO: do we want to 0x2000 byte align like nintendo does?
-        // newNode.nodeDataOffset = trailingFile.fileOffset + trailingFile.fileLength;
-        // // 4 byte align, although the "standard" is non-specific
-        // newNode.nodeDataOffset += newNode.nodeDataOffset % 4;
-        // // add data to end of data string (with 4 byte alignment)
-        // // to find out what node end offset is
-        // nodes.push_back(newNode);
+        SFATNode newNode{};
+        uint32_t fileLength = 0, dataPadSize = 0;
 
-        // return SARCError::NONE;
+        if (isEmpty)
+        {
+            return SARCError::SARC_IS_EMTPY;
+        }
+
+        sfatHeader.nodeCount += 1;
+        newNode.fileNameHash = SFATNameHash(fileName.data(), fileName.length(), sfatHeader.hashKey_0x65);
+        auto newEntryOffset = insertIntoStringList(filename);
+        // offset is divided by 4 in file attributes
+        newEntryOffset /= 4;
+        newNode.fileAttributes = 0x01000000 | newEntryOffset;
+        if (sfatHeader.nodeCount == 1)
+        {
+            newNode.nodeDataOffset = 0;
+            dataPadSize = 0;
+        }
+        else
+        {
+            // we guarantee the file spec list is sorted during reading
+            const auto& trailingFile = files.back();
+            newNode.nodeDataOffset = trailingFile.fileOffset + trailingFile.fileLength;
+            // byte align, although the "standard" is non-specific
+            newNode.nodeDataOffset = Utility::byte_align<uint32_t>(newNode.nodeDataOffset, 0x2000);
+            // will need to pad out file data to the offset point to copy file data
+            dataPadSize = newNode.nodeDataOffset - fileData.size();
+        }
+        // append padding zeros to data
+        fileData.append(dataPadSize, '\0');
+
+        if (!inputData.seekg(0, std::ios::end))
+        {
+            return SARCError::REACHED_EOF;
+        }
+        fileLength = inputData.tellg();
+        if (!inputData.seekg(0, std::ios::beg))
+        {
+            return SARCError::REACHED_EOF;
+        }
+        newNode.nodeDataEnd = newNode.nodeDataOffset + fileLength;
+        nodes.push_back(newNode);
+
+        fileData.reserve(newNode.nodeDataEnd);
+        if (!inputData.read(&fileData[newNode.nodeDataOffset], fileLength))
+        {
+            return SARCError::REACHED_EOF;
+        }
+        return SARCError::NONE;
     }
 
     SARCError SARCFile::removeFile(const std::string& fileName)

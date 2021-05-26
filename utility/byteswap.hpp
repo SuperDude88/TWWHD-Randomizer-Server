@@ -31,18 +31,12 @@ namespace Utility
     template<typename T>
     inline T byte_align_offset(T toAlign, T alignment = sizeof(T))
     {
-        T mod = toAlign % alignment;
-        if(mod == 0)
-        {
-            return 0;
-        }
-        return alignment - mod;
+        return (alignment - toAlign % alignment) % alignment;
     }
 
     template<typename T>
     inline T byte_align(T toAlign, T alignment = sizeof(T))
     {
-        
         return toAlign + byte_align_offset(toAlign, alignment);
     }
 }

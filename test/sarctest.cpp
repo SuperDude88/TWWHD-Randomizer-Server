@@ -10,7 +10,7 @@ constexpr char PATHSEP = '\\';
 constexpr char PATHSEP = '/';
 #endif
 
-int unpackSARC(std::string sarcPath, std::string outPath)
+int unpackSARC(const std::string& sarcPath, const std::string& outPath)
 {
     FileTypes::SARCFile sarc{sarcPath};
     SARCError err;
@@ -52,26 +52,29 @@ int unpackSARC(std::string sarcPath, std::string outPath)
 
 int main(int argc, char** argv)
 {
-    if (argc < 4)
-    {
-        std::cout << "Usage: sarctest [-p/-u] [outfile] [infile(s)]" << std::endl;
-        return 1;
-    }
+    //if (argc < 4)
+    //{
+    //    std::cout << "Usage: sarctest [-p/-u] [outfile] [infile(s)]" << std::endl;
+    //    return 1;
+    //}
 
-    std::string flag(argv[1]);
-    bool pack = true;
-    if (flag.compare("-p") == 0)
-    {
-        pack = true;
-    }
-    else if (flag.compare("-u") == 0)
-    {
-        pack = false;
-    }
+    //std::string flag(argv[1]);
+    //bool pack = true;
+    //if (flag.compare("-p") == 0)
+    //{
+    //    pack = true;
+    //}
+    //else if (flag.compare("-u") == 0)
+    //{
+    //    pack = false;
+    //}
+    bool pack = false;
+
 
     // in unpack case, outfile is a directory
     // in pack case, outfile is a destination sarc file
-    std::string outfile(argv[2]);
+    //std::string outfile(argv[2]);
+    std::string outfile(R"~(C:\workspace\wiiu_hacks\temp\SARC)~");
     // if we are packing, we can expect multiple input files
     std::vector<std::string> toPack{};
     std::string toUnpack;
@@ -86,7 +89,8 @@ int main(int argc, char** argv)
     }
     else 
     {
-        toUnpack = argv[3];
+        //toUnpack = argv[3];
+        toUnpack = R"~(C:\workspace\wiiu_hacks\temp\SARC\sea_Room26.szs.dec)~";
         return unpackSARC(toUnpack, outfile);
     }
 }

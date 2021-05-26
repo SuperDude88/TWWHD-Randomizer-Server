@@ -67,6 +67,7 @@ enum struct SARCError
     HEADER_DATA_NOT_LOADED,
     FILE_DATA_NOT_LOADED,
     SARC_NOT_EMPTY,
+    SARC_IS_EMTPY,
     UNKNOWN,
     COUNT
 };
@@ -114,7 +115,7 @@ namespace FileTypes
         // initialize a new SARC file, must be empty 
         SARCError createNew();
         SARCError loadFromBinary(std::istream& sarc, bool headerOnly = false);
-        SARCError loadFromFile(std::string filePath, bool headerOnly = false);
+        SARCError loadFromFile(const std::string& filePath, bool headerOnly = false);
         std::vector<SARCFileSpec> getFileList();
         SARCError readFile(const SARCFileSpec& file, std::string& dataOut, uint32_t offset = 0, uint32_t bytes = 0);
         SARCError patchFile(const SARCFileSpec& file, const std::string& patch, uint32_t offset);
