@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 
 #ifdef _WIN32
 constexpr char PATHSEP = '\\';
@@ -55,6 +56,10 @@ int packSARC(const std::vector<std::string>& filenames, const std::string& outFi
 {
     auto sarc = FileTypes::SARCFile::createNew(outFile);
     SARCError err = SARCError::NONE;
+    if (filenames.size() == 0)
+    {
+        return 1;
+    }
 
     for (const auto& filename : filenames)
     {

@@ -218,9 +218,11 @@ SARCError readSFATStringTable(std::istream& sfat, std::vector<StringTableEntry>&
         std::string str(buffer, sfat.gcount() - 1);
         out.emplace_back(StringTableEntry{stringOffset, str});
         char next = 0;
+        auto end = sfat.tellg();
+        end += 8;
         // continue until non-null character, as strings may be 
-        // byte aligned with zero pads
-        while(sfat.tellg() < dataOffset && (next = sfat.get()) == '\0');
+        // byte aligned with zero pads, but only go as far as 8 bytes
+        while(sfat.tellg() < end && (next = sfat.get()) == '\0');
         if(next != '\0')
         {
             sfat.unget();
