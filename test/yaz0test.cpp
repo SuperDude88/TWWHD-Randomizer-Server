@@ -23,10 +23,6 @@ int main(int argc, char** argv)
     {
         outFilename = filename;
     }
-    
-
-    //std::string flag("-d");
-    //std::string filename(R"~(..\..\..\..\test\data\yaz0\M_NewD2_Room12.szs.dec.yaz0)~");
 
     std::cout << flag << " " << filename << std::endl;
     // MUST BE OPEN IN BINARY MODE YA IDIOT 

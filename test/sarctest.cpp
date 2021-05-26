@@ -92,16 +92,16 @@ int packSARC(const std::vector<std::string>& filenames, const std::string& outFi
 int main(int argc, char** argv)
 {
     
-    //if (argc < 4)
-    //{
-    //    std::cout << "Usage: sarctest [-p/-u] [outfile] [infile(s)]" << std::endl;
-    //    return 1;
-    //}
-    argc = 5;
-    argv[1] = "-p";
-    argv[2] = R"~(C:\workspace\wiiu_hacks\temp\SARC\TF_01_Room1.szs.repack)~";
-    argv[3] = R"~(C:\workspace\wiiu_hacks\temp\SARC\Room1.bfres)~";
-    argv[4] = R"~(C:\workspace\wiiu_hacks\temp\SARC\model.sharcfb)~";
+    if (argc < 4)
+    {
+       std::cout << "Usage: sarctest [-p/-u] [outfile] [infile(s)]" << std::endl;
+       return 1;
+    }
+    //argc = 5;
+    // argv[1] = "-p";
+    // argv[2] = R"~(C:\workspace\wiiu_hacks\temp\SARC\TF_01_Room1.szs.repack)~";
+    // argv[3] = R"~(C:\workspace\wiiu_hacks\temp\SARC\Room1.bfres)~";
+    // argv[4] = R"~(C:\workspace\wiiu_hacks\temp\SARC\model.sharcfb)~";
     
 
     std::string flag(argv[1]);
