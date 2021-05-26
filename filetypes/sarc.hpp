@@ -111,9 +111,9 @@ namespace FileTypes
     class SARCFile 
     {
     public:
-        SARCFile(std::string filename);
+        SARCFile();
         // initialize a new SARC file, must be empty 
-        SARCError createNew();
+        static SARCFile createNew(const std::string& filename);
         SARCError loadFromBinary(std::istream& sarc, bool headerOnly = false);
         SARCError loadFromFile(const std::string& filePath, bool headerOnly = false);
         std::vector<SARCFileSpec> getFileList();
@@ -126,14 +126,14 @@ namespace FileTypes
         SARCError addFile(const std::string& fileName, std::istream& fileData);
         SARCError removeFile(const std::string& fileName);
     private:
+        void initNew();
         uint32_t insertIntoStringList(std::string str);
 
-        std::string filename;
-        SARCHeader sarcHeader;
-        SFATHeader sfatHeader;
-        std::vector<SFATNode> nodes;
-        SFATFileNameTableHeader sfntHeader;
-        std::vector<StringTableEntry> stringTable;
+        SARCHeader sarcHeader{};
+        SFATHeader sfatHeader{};
+        std::vector<SFATNode> nodes{};
+        SFATFileNameTableHeader sfntHeader{};
+        std::vector<StringTableEntry> stringTable{};
         bool isEmpty = true;
         std::string fileData{};
         std::vector<SARCFileSpec> files{};

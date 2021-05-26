@@ -20,7 +20,10 @@ uint32_t SFATNameHash(const char* name, int length, uint32_t key)
 	uint32_t result = 0;
 	for(int i = 0; i < length; i++)
 	{
-		result = name[i] + result * key;
+        char c = name[i];
+        // early terminate if we hit null
+        if (c == '\0') return result;
+		result = c + result * key;
 	}
 	return result;
 }
@@ -253,6 +256,8 @@ namespace FileTypes {
             return "FILE_DATA_NOT_LOADED";
         case SARCError::SARC_NOT_EMPTY:
             return "SARC_NOT_EMPTY";
+        case SARCError::SARC_IS_EMTPY:
+            return "SARC_IS_EMPTY";
         case SARCError::UNKNOWN:
             return "UNKNOWN";
         case SARCError::COUNT:
@@ -262,17 +267,13 @@ namespace FileTypes {
         }
     }
 
-    SARCFile::SARCFile(std::string filename): filename(filename)
+    SARCFile::SARCFile()
     {
 
     }
 
-    SARCError SARCFile::createNew()
+    void SARCFile::initNew()
     {
-        if (!isEmpty)
-        {
-            return SARCError::SARC_NOT_EMPTY;
-        }
         isEmpty = false;
         // init sarc header
         std::memcpy(sarcHeader.magicSARC, "SARC", 4);
@@ -291,7 +292,13 @@ namespace FileTypes {
         std::memcpy(sfntHeader.magicSFNT, "SFNT", 4);
         sfntHeader.headerLength_0x8 = 0x8;
         std::memset(sfntHeader._unused, '\0', 2);
-        return SARCError::NONE;
+    }
+
+    SARCFile SARCFile::createNew(const std::string& filename)
+    {
+        SARCFile newSARC{};
+        newSARC.initNew();
+        return newSARC;
     }
 
     SARCError SARCFile::loadFromBinary(std::istream& sarc, bool headerOnly)
@@ -389,7 +396,7 @@ namespace FileTypes {
 
     SARCError SARCFile::loadFromFile(const std::string& filePath, bool headerOnly)
     {
-        std::ifstream file(filePath);
+        std::ifstream file(filePath, std::ios::binary);
         if(!file.is_open())
         {
             return SARCError::COULD_NOT_OPEN;
@@ -502,7 +509,7 @@ namespace FileTypes {
 
     SARCError SARCFile::writeToFile(const std::string& outFilePath)
     {
-        std::ofstream outFile(outFilePath);
+        std::ofstream outFile(outFilePath, std::ios::binary);
         if(!outFile.is_open())
         {
             return SARCError::COULD_NOT_OPEN;
@@ -513,16 +520,19 @@ namespace FileTypes {
     uint32_t SARCFile::insertIntoStringList(std::string str)
     {
         StringTableEntry newEntry;
+        uint16_t endOfPrev = 0;
         newEntry.str = str;
-        auto maxOffEntryIt = std::max_element(
-            stringTable.begin(), 
-            stringTable.end(), 
-            [](const StringTableEntry& l, const StringTableEntry& r) {return l.offset < r.offset;}
-        );
-        const auto& maxOffEntry = *maxOffEntryIt;
-        uint16_t endOfPrev = maxOffEntry.offset;
-        // add one for null terminator
-        endOfPrev += maxOffEntry.str.length();
+        if (!stringTable.empty())
+        {
+            auto maxOffEntryIt = std::max_element(
+                stringTable.begin(),
+                stringTable.end(),
+                [](const StringTableEntry& l, const StringTableEntry& r) {return l.offset < r.offset; }
+            );
+            const auto& maxOffEntry = *maxOffEntryIt;
+            endOfPrev = maxOffEntry.offset;
+            endOfPrev += maxOffEntry.str.length();
+        }
         // add whatever was needed before for 4 byte alignment
         endOfPrev += Utility::byte_align_offset<uint32_t>(endOfPrev);
         newEntry.offset = endOfPrev;
@@ -530,9 +540,11 @@ namespace FileTypes {
         return newEntry.offset;
     }
 
-    SARCError SARCFile::addFile(const std::string& fileName, std::istream& inputData)
+    // note: filename must not be null terminated (I mean, it is a std::string)
+    SARCError SARCFile::addFile(const std::string& addFileName, std::istream& inputData)
     {
         SFATNode newNode{};
+        SARCFileSpec newSpec{};
         uint32_t fileLength = 0, dataPadSize = 0;
 
         if (isEmpty)
@@ -541,8 +553,8 @@ namespace FileTypes {
         }
 
         sfatHeader.nodeCount += 1;
-        newNode.fileNameHash = SFATNameHash(fileName.data(), fileName.length(), sfatHeader.hashKey_0x65);
-        auto newEntryOffset = insertIntoStringList(filename);
+        newNode.fileNameHash = SFATNameHash(addFileName.data(), addFileName.length(), sfatHeader.hashKey_0x65);
+        auto newEntryOffset = insertIntoStringList(addFileName);
         // offset is divided by 4 in file attributes
         newEntryOffset /= 4;
         newNode.fileAttributes = 0x01000000 | newEntryOffset;
@@ -576,11 +588,18 @@ namespace FileTypes {
         newNode.nodeDataEnd = newNode.nodeDataOffset + fileLength;
         nodes.push_back(newNode);
 
-        fileData.reserve(newNode.nodeDataEnd);
+        // see notes of https://en.cppreference.com/w/cpp/container/vector/resize if 
+        // this becomes a bottleneck
+        fileData.resize(newNode.nodeDataEnd);
         if (!inputData.read(&fileData[newNode.nodeDataOffset], fileLength))
         {
             return SARCError::REACHED_EOF;
         }
+
+        newSpec.fileName = addFileName;
+        newSpec.fileOffset = newNode.nodeDataOffset;
+        newSpec.fileLength = fileLength;
+        files.push_back(newSpec);
         return SARCError::NONE;
     }
 

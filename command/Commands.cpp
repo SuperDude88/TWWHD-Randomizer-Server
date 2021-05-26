@@ -56,9 +56,9 @@ namespace Commands {
 
     CommandError convertRPXToELF(const std::string& rpxPath, const std::string& outPath)
     {
-        std::ifstream rpxFile(rpxPath);
+        std::ifstream rpxFile(rpxPath, std::ios::binary);
         if(!rpxFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
-        std::ofstream elfFile(outPath);
+        std::ofstream elfFile(outPath, std::ios::binary);
         if(!elfFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
         if(FileTypes::rpx_decompress(rpxFile, elfFile))
         {
@@ -69,9 +69,9 @@ namespace Commands {
 
     CommandError convertELFToRPX(const std::string& elfPath, const std::string& outPath)
     {
-        std::ifstream elfFile(elfPath);
+        std::ifstream elfFile(elfPath, std::ios::binary);
         if(!elfFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
-        std::ofstream rpxFile(outPath);
+        std::ofstream rpxFile(outPath, std::ios::binary);
         if(!rpxFile.is_open()) return CommandError::CANNOT_OPEN_FILE;
         if(FileTypes::rpx_decompress(elfFile, rpxFile))
         {
