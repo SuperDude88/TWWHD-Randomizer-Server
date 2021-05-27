@@ -8,9 +8,6 @@
 #include <zlib.h>
 #include "wiiurpx.hpp"
 
-#ifdef PLATFOMR_MSVC
-    #pragma warning(disable : 4996)
-#endif
 
 using namespace std;
 
@@ -29,6 +26,8 @@ u32 crc32_rpx(u32 crc, u8 *buff, u32 len);
 bool SortFunc(const Elf32_Shdr_Sort &v1, const Elf32_Shdr_Sort &v2);
 
 namespace FileTypes {
+    // note for later docs: be sure to open file in binary mode
+    // maybe see if there's a way to check internally?
     int rpx_decompress(ifstream& in, ofstream& out)
     {
         Elf32_Ehdr ehdr;
@@ -74,7 +73,7 @@ namespace FileTypes {
         vector< Elf32_Shdr_Sort > shdr_table_index;
         Elf32_Shdr *shdr_table = new Elf32_Shdr[ehdr.e_shnum];
         while (static_cast<ulg>(out.tellp()) < shdr_data_elf_offset) out.put(0);
-        in.seekg(ehdr.e_shoff);
+        if (!in.seekg(ehdr.e_shoff)) return -1;
         for (u32 i=0; i<ehdr.e_shnum; i++)
         {
             crcs[i] = 0;
@@ -99,8 +98,11 @@ namespace FileTypes {
         sort(shdr_table_index.begin(), shdr_table_index.end(), SortFunc);
         for(vector<Elf32_Shdr_Sort>::iterator shdr_index=shdr_table_index.begin();shdr_index!=shdr_table_index.end();shdr_index++)
         {
-            pos = shdr_table[shdr_index->index].sh_offset; 
-            in.seekg(pos);
+            pos = shdr_table[shdr_index->index].sh_offset;
+            if (!in.seekg(pos))
+            {
+                return -1;
+            }
             shdr_table[shdr_index->index].sh_offset = out.tellp();
             if((shdr_table[shdr_index->index].sh_flags & SHF_RPL_ZLIB) == SHF_RPL_ZLIB)
             {
@@ -116,8 +118,12 @@ namespace FileTypes {
                 strm.opaque = Z_NULL;
                 strm.avail_in = 0;
                 strm.next_in = Z_NULL;
-                inflateInit(&strm);
-                while(data_size>0)
+                int err = Z_OK;
+                if ((err = inflateInit(&strm)) != Z_OK)
+                {
+                    return err;
+                }
+                while(data_size > 0)
                 {
                     block_size = CHUNK;
                     if(data_size<block_size)
@@ -130,13 +136,20 @@ namespace FileTypes {
                     {
                         strm.avail_out = CHUNK;
                         strm.next_out = reinterpret_cast<Bytef*>(buff_out);
-                        inflate(&strm, Z_NO_FLUSH);
+                        err = inflate(&strm, Z_NO_FLUSH);
+                        if (err != Z_OK && err != Z_BUF_ERROR && err != Z_STREAM_END)
+                        {
+                            return err;
+                        }
                         have = CHUNK - strm.avail_out;
                         out.write(buff_out, have);
                         crcs[shdr_index->index] = crc32_rpx(crcs[shdr_index->index], reinterpret_cast<u8*>(buff_out), have);
                     }while(strm.avail_out == 0);
                 }
-                inflateEnd(&strm);
+                if ((err = inflateEnd(&strm)) != Z_OK)
+                {
+                    return err;
+                }
                 shdr_table[shdr_index->index].sh_flags &= ~SHF_RPL_ZLIB;
             }
             else
@@ -147,7 +160,7 @@ namespace FileTypes {
                 {
                     char data[CHUNK];
                     block_size = CHUNK;
-                    if(data_size<block_size)
+                    if(data_size < block_size)
                         block_size = data_size;
                     data_size -= block_size;
                     in.read(data, block_size);
@@ -471,38 +484,38 @@ u64 Low2Big_u64(u64 a)
 void fread16_BE(u16 &i, ifstream& f)
 {
     u16 p = 0;
-    f.read(reinterpret_cast<char*>(&p), sizeof(p));
+    f.read(reinterpret_cast<char*>(&p), 2);
     i = Low2Big_u16(p);
 }
 
 void fread32_BE(u32 &i, ifstream& f)
 {
     u32 p = 0;
-    f.read(reinterpret_cast<char*>(&p), sizeof(p));
+    f.read(reinterpret_cast<char*>(&p), 4);
     i = Low2Big_u32(p);
 }
 
 void fread64_BE(u64 &i, ifstream& f)
 {
     u64 p = 0;
-    f.read(reinterpret_cast<char*>(&p), sizeof(p));
+    f.read(reinterpret_cast<char*>(&p), 8);
     i = Low2Big_u64(p);
 }
 
 void fwrite16_BE(u16 i, ofstream& f)
 {
     u16 p = Low2Big_u16(i);
-    f.write(reinterpret_cast<char*>(&p), sizeof(p));
+    f.write(reinterpret_cast<char*>(&p), 2);
 }
 
 void fwrite32_BE(u32 i, ofstream& f)
 {
     u32 p = Low2Big_u32(i);
-    f.write(reinterpret_cast<char*>(&p), sizeof(p));
+    f.write(reinterpret_cast<char*>(&p), 4);
 }
 
 void fwrite64_BE(u64 i, ofstream& f)
 {
     u64 p = Low2Big_u64(i);
-    f.write(reinterpret_cast<char*>(&p), sizeof(p));
+    f.write(reinterpret_cast<char*>(&p), 8);
 }

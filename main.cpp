@@ -8,6 +8,7 @@
 #include <fstream>
 
 #include "ProtocolServer.hpp"
+#include "filetypes/wiiurpx.hpp"
 
 #define SERVER_TCP_PORT 1234
 

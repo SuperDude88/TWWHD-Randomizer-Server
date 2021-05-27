@@ -9,6 +9,7 @@
 	#define PLATFORM_DKP
 #elif defined(_MSC_VER)
 	#define PLATFORM_MSVC
+	#define ZLIB_WINAPI 
 #elif defined(__GNUC__) || defined(__GNUG__)
 	#define PLATFORM_GCC
 #elif defined(__clang__)

@@ -1,0 +1,33 @@
+[
+    {
+        "path": "code/cking.rpx",
+        "type": "rpx",
+        "initialHash": "c4f0ab300542e0bfc462696850534e71db2ad02288a7eb55e5a4cd4062f16153",
+        "finalHash": "7991c4f75abaf3c4db1eafcfb8062bc803928bffa23920ea1af6e2115dc8b84d"
+    },
+    {
+        "path": "content/Common/Stage/M_NewD2_Room13.szs", 
+        "type": "yaz0", 
+        "initialHash": "992a799963caca3613e4af868e86634d6c424ee1c8366c7105471ecc5a822446",
+        "finalHash": "a1d93207b8f8682d3ae55c3f95736c5563a124d0a80b7fde9ac511076ec80ed0"
+    },
+    {
+        "path": "content/Common/Stage/Kaisen_Stage.szs",
+        "type": "yaz0",
+        "initialHash": "11e3b3fc0794e8123537d44bb003fd0b9afc09682753f5bdd5bf8f9712e788d6",
+        "finalHash": "50d146a5ed113c916ad9fc592595dec421eaf5211f1d8e70d15f4c237a94810e"
+    },
+    {
+        "path": "content/Common/Stage/Opub_Stage.szs",
+        "type": "yaz0@SARC",
+        "initialHash": "11e3b3fc0794e8123537d44bb003fd0b9afc09682753f5bdd5bf8f9712e788d6",
+        "finalHash": [
+            {"filename": "Opub_Stage.szs.dec", "hash": "acafddf6d918841af8e910228549237c4165f6c3adde68de1187254599be88c9"},
+            {"filename": "Stage.bfres", "hash": "bf96824f66ec79d3aad8f7cc26a892d03b0c1d8e2aefa3a54f45ec1d93e499a5"}, 
+            {"filename": "vr_back_cloud.sharcfb", "hash": "7da7751d42f353d1f20e1f1ca9764325b4b1fcffdfe44d4fd4d390e90b25d053"},
+            {"filename": "vr_kasumi_mae.sharcfb", "hash": "af1d951f456ae97cfdb57a97e76cc2de6ed6d43247328b86c8e8b55eb9559dc3"},
+            {"filename": "vr_sky.sharcfb", "hash": "9da7ae7508a7dfcf3b7eae1fce3ba12e1ad740078e7fe39c7001b850efa227cc"},
+            {"filename": "vr_uso_umi.sharcfb", "hash": "a073520051db88c07ccfc2c9f406e1cc0ffbfa80d601c775760d64504b2c49f8"}
+        ]
+    }
+]

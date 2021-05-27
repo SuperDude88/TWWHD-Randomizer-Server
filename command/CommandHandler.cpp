@@ -1,5 +1,6 @@
 
 #include "CommandHandler.hpp"
+#include "Commands.hpp"
 #include "../utility/platform.hpp"
 #include <sstream>
 #include <fstream>
@@ -18,7 +19,6 @@ void CommandHandler::makeErrorJson(std::string errorMessage, std::string& respon
 bool CommandHandler::getBinaryData(const std::vector<json>& args, std::string& response)
 {
     size_t offset = 0, length = 0;
-    char* data;
     std::stringstream ss{""};
     if (args.size() != 3)
     {
@@ -53,25 +53,13 @@ bool CommandHandler::getBinaryData(const std::vector<json>& args, std::string& r
         return false;
     }
 
-    std::ifstream file(path.c_str(), std::ios::binary);
-    if (!file.is_open())
+    char* data = new char[length];
+    Commands::CommandError err;
+    if((err = Commands::getBinaryData(path, offset, length, data)) != Commands::CommandError::NONE)
     {
-        makeErrorJson("Unable to open file", response);
-        return false;
-    }
-    file.seekg(offset);
-    if (!file.good())
-    {
-        makeErrorJson("file is shorter than start position", response);
-        return false;
-    }
-
-    data = new char[length];
-    file.read(data, length);
-    if(file.fail())
-    {
-        delete[] data;
-        makeErrorJson("reached end of file while reading", response);
+        std::string msg = "Unable to read from specified file: ";
+        msg += Commands::getErrorName(err);
+        makeErrorJson(msg, response);
         return false;
     }
     
