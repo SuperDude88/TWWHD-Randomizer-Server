@@ -28,7 +28,10 @@ add_executable(wwhd_rando_server main.cpp ProtocolServer.cpp)
 add_subdirectory("utility")
 add_subdirectory("command")
 add_subdirectory("filetypes")
-add_subdirectory("test")
+# we don't build tests for console currently
+if(NOT DEFINED DEVKITPRO)
+  add_subdirectory("test")
+endif()
 
 if(WIN32)
   target_link_libraries(wwhd_rando_server zlib)

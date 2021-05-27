@@ -7,11 +7,7 @@
 #include <algorithm> 
 #include <zlib.h>
 #include "wiiurpx.hpp"
-#include "../utility/platform.hpp"
 
-#ifdef PLATFORM_MSVC
-    #pragma warning(disable : 4996)
-#endif
 
 using namespace std;
 
