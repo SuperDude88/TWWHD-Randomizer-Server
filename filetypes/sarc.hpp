@@ -123,6 +123,7 @@ namespace FileTypes
         SARCError appendToFile(const SARCFileSpec& file, const std::string& data);
         SARCError writeToStream(std::ostream& out, uint32_t minDataOffset = NINTENDO_MIN_OFFSET);
         SARCError writeToFile(const std::string& outFilePath);
+        SARCError extractToDir(const std::string& dirPath);
         SARCError addFile(const std::string& fileName, std::istream& fileData);
         SARCError removeFile(const std::string& fileName);
     private:

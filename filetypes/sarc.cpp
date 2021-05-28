@@ -542,6 +542,23 @@ namespace FileTypes {
         return newEntry.offset;
     }
 
+    SARCError SARCFile::extractToDir(const std::string& dirPath)
+    {
+        if (isEmpty) return SARCError::HEADER_DATA_NOT_LOADED;
+        if (fileData.size() == 0) return SARCError::FILE_DATA_NOT_LOADED;
+        for (const auto& file : files)
+        {
+            // test on msvc for portability
+            std::ofstream outFile(dirPath + '/' + file.fileName);
+            if (!outFile.is_open())
+            {
+                return SARCError::COULD_NOT_OPEN;
+            }
+            outFile.write(&fileData[file.fileOffset], file.fileLength);
+        }
+        return SARCError::NONE;
+    }
+
     // note: filename must not be null terminated (I mean, it is a std::string)
     SARCError SARCFile::addFile(const std::string& addFileName, std::istream& inputData)
     {
